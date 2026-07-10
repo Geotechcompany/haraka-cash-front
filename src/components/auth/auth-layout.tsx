@@ -29,8 +29,8 @@ export function AuthLayout({
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
             <div className="mt-8">{children}</div>
-            {footer && <div className="mt-6 text-sm text-muted-foreground">{footer}</div>}
-            <p className="mt-10 text-xs text-muted-foreground">
+            {footer && <div className="mt-6 text-sm text-foreground/70">{footer}</div>}
+            <p className="mt-10 text-xs text-foreground/60">
               By continuing you agree to our <Link to="/" className="underline">Terms</Link> and <Link to="/" className="underline">Privacy Policy</Link>.
             </p>
           </div>

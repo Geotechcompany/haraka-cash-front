@@ -1,0 +1,12 @@
+# TanStack Start + Nitro on Netlify (SSR via serverless functions).
+# Do NOT publish .output/public alone — that is static assets only.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[dev]
+  command = "npm run dev"
+  port = 3000
+
+[build.environment]
+  NODE_VERSION = "22"

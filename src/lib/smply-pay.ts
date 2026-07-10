@@ -1,4 +1,13 @@
-const DEFAULT_BASE_URL = "https://api.smplypay.com";
+import "@/lib/server-only";
+
+// api.smplypay.com does not resolve; SMPLY Pay serves API from the main domain.
+const DEFAULT_BASE_URL = "https://smplypay.com";
+
+const DEFAULT_PATHS = {
+  wallet: "/v1/wallet/balance",
+  stk: "/api/v1/provider-one",
+  withdraw: "/api/v1/provider-one/externalb2c",
+} as const;
 
 type SmplyRequestOptions = {
   method?: "GET" | "POST";
@@ -35,8 +44,77 @@ function getApiKey() {
   return key;
 }
 
+function getClientId() {
+  const id = process.env.SMPLY_PAY_CLIENT_ID;
+  if (!id) {
+    throw new Error("SMPLY_PAY_CLIENT_ID is not configured");
+  }
+  return id;
+}
+
+function getAuthStyle() {
+  if (process.env.SMPLY_PAY_AUTH_STYLE) {
+    return process.env.SMPLY_PAY_AUTH_STYLE;
+  }
+  return process.env.SMPLY_PAY_CLIENT_ID ? "client-id" : "bearer";
+}
+
 function getBaseUrl() {
-  return process.env.SMPLY_PAY_API_BASE ?? DEFAULT_BASE_URL;
+  return (process.env.SMPLY_PAY_API_BASE ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+function getApiPath(kind: keyof typeof DEFAULT_PATHS) {
+  const envKey = `SMPLY_PAY_${kind.toUpperCase()}_PATH` as const;
+  return process.env[envKey] ?? DEFAULT_PATHS[kind];
+}
+
+function getStkUrl() {
+  const fullUrl = process.env.SMPLY_PAY_STK_URL?.trim();
+  if (fullUrl) return fullUrl.replace(/\/$/, "");
+  return `${getBaseUrl()}${getApiPath("stk")}`;
+}
+
+export function getSmplyAuthHeaders(): Record<string, string> {
+  const key = getApiKey();
+  const style = getAuthStyle();
+  if (style === "client-id") {
+    return { client_id: getClientId(), api_key: key };
+  }
+  if (style === "raw") {
+    return { Authorization: key };
+  }
+  if (style === "api-key") {
+    return { "X-API-KEY": key };
+  }
+  return { Authorization: `Bearer ${key}` };
+}
+
+export function maskApiKey(key: string) {
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 4)}...${key.slice(-4)}`;
+}
+
+export function getSmplyPayConfigSummary() {
+  const key = process.env.SMPLY_PAY_API_KEY;
+  const clientId = process.env.SMPLY_PAY_CLIENT_ID;
+  const withdrawPath = getApiPath("withdraw");
+  return {
+    baseUrl: getBaseUrl(),
+    apiKeySet: Boolean(key),
+    apiKeyMasked: key ? maskApiKey(key) : undefined,
+    clientIdSet: Boolean(clientId),
+    clientIdMasked: clientId ? maskApiKey(clientId) : undefined,
+    appUrl: process.env.APP_URL ?? process.env.VITE_APP_URL ?? "http://localhost:3000",
+    callbackUrl: getCallbackUrl("/api/webhooks/smply-pay"),
+    authStyle: getAuthStyle(),
+    paths: {
+      wallet: getApiPath("wallet"),
+      stk: getApiPath("stk"),
+      withdraw: withdrawPath,
+    },
+    stkUrl: getStkUrl(),
+    withdrawUrl: `${getBaseUrl()}${withdrawPath}`,
+  };
 }
 
 function getCallbackUrl(path: string) {
@@ -52,16 +130,30 @@ export function normalizeKenyanPhone(phone: string) {
   return digits;
 }
 
-async function smplyRequest<T>(path: string, options: SmplyRequestOptions = {}) {
-  const response = await fetch(`${getBaseUrl()}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+async function smplyRequest<T>(
+  pathOrUrl: string,
+  options: SmplyRequestOptions = {},
+  requestUrl?: string,
+) {
+  const url = requestUrl ?? `${getBaseUrl()}${pathOrUrl}`;
+  const method = options.method ?? "GET";
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers: {
+        ...getSmplyAuthHeaders(),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "network error";
+    throw new Error(
+      `Cannot reach SMPLY Pay at ${getBaseUrl()} (${reason}). Set SMPLY_PAY_API_BASE to the URL from your SMPLY Pay dashboard.`,
+    );
+  }
 
   const text = await response.text();
   let payload: unknown = text;
@@ -72,17 +164,46 @@ async function smplyRequest<T>(path: string, options: SmplyRequestOptions = {}) 
   }
 
   if (!response.ok) {
-    const message =
+    const providerMessage =
       typeof payload === "object" &&
       payload !== null &&
       "message" in payload &&
       typeof (payload as { message?: unknown }).message === "string"
         ? (payload as { message: string }).message
-        : `SMPLY Pay request failed (${response.status})`;
-    throw new Error(message);
+        : undefined;
+    const message =
+      providerMessage ??
+      `SMPLY Pay request failed (${response.status})`;
+    throw new Error(
+      `${message} [${method} ${url} → HTTP ${response.status}]`,
+    );
   }
 
   return payload as T;
+}
+
+export function buildStkPushBody(input: {
+  phone: string;
+  amount: number;
+  reference: string;
+  description: string;
+  callbackUrl: string;
+}) {
+  const phone = normalizeKenyanPhone(input.phone);
+  const amount = Math.round(input.amount);
+  return {
+    phone,
+    PhoneNumber: phone,
+    PartyA: phone,
+    amount,
+    Amount: amount,
+    reference: input.reference,
+    AccountReference: input.reference,
+    description: input.description,
+    TransactionDesc: input.description,
+    callback_url: input.callbackUrl,
+    CallBackURL: input.callbackUrl,
+  };
 }
 
 function pickString(data: Record<string, unknown>, keys: string[]) {
@@ -105,7 +226,7 @@ function pickNumber(data: Record<string, unknown>, keys: string[]) {
 }
 
 export async function getSmplyWalletBalance(): Promise<SmplyWalletBalance> {
-  const raw = await smplyRequest<Record<string, unknown>>("/v1/wallet/balance");
+  const raw = await smplyRequest<Record<string, unknown>>(getApiPath("wallet"));
   const balance =
     pickNumber(raw, ["balance", "available_balance", "wallet_balance", "amount"]) ?? 0;
   const currency = pickString(raw, ["currency", "currency_code"]) ?? "KES";
@@ -118,16 +239,21 @@ export async function initiateProcessingFeeStkPush(input: {
   reference: string;
   description: string;
 }) {
-  const raw = await smplyRequest<Record<string, unknown>>("/v1/stk/push", {
-    method: "POST",
-    body: {
-      phone: normalizeKenyanPhone(input.phone),
-      amount: Math.round(input.amount),
-      reference: input.reference,
-      description: input.description,
-      callback_url: getCallbackUrl("/api/webhooks/smply-pay"),
+  const callbackUrl = getCallbackUrl("/api/webhooks/smply-pay");
+  const raw = await smplyRequest<Record<string, unknown>>(
+    getApiPath("stk"),
+    {
+      method: "POST",
+      body: buildStkPushBody({
+        phone: input.phone,
+        amount: input.amount,
+        reference: input.reference,
+        description: input.description,
+        callbackUrl,
+      }),
     },
-  });
+    getStkUrl(),
+  );
 
   const providerRef = pickString(raw, [
     "transaction_id",
@@ -157,7 +283,7 @@ export async function initiateSmplyWithdrawal(input: {
   reference: string;
   description?: string;
 }) {
-  const raw = await smplyRequest<Record<string, unknown>>("/v1/withdraw", {
+  const raw = await smplyRequest<Record<string, unknown>>(getApiPath("withdraw"), {
     method: "POST",
     body: {
       phone: normalizeKenyanPhone(input.phone),

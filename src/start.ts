@@ -3,6 +3,23 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 
+const clerkAuth = clerkMiddleware({
+  signInUrl: "/login",
+  signUpUrl: "/register",
+  signInFallbackRedirectUrl: "/dashboard",
+  signUpFallbackRedirectUrl: "/dashboard",
+});
+
+const authMiddleware = createMiddleware().server(async ({ request, next, context }) => {
+  const pathname = new URL(request.url).pathname;
+  if (pathname.startsWith("/api/webhooks/")) {
+    return next();
+  }
+  const runClerk = clerkAuth.options.server;
+  if (!runClerk) return next();
+  return runClerk({ request, next, context });
+});
+
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
@@ -19,5 +36,5 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [clerkMiddleware(), errorMiddleware],
+  requestMiddleware: [authMiddleware, errorMiddleware],
 }));

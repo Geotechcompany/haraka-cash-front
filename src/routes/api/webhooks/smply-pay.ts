@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { handleSmplyPayWebhook } from "@/server/payments";
-
 export const Route = createFileRoute("/api/webhooks/smply-pay")({
   server: {
     handlers: {
@@ -16,6 +14,7 @@ export const Route = createFileRoute("/api/webhooks/smply-pay")({
           });
         }
 
+        const { handleSmplyPayWebhook } = await import("@/server/payments");
         const result = await handleSmplyPayWebhook(payload);
         return new Response(JSON.stringify(result), {
           status: result.ok ? 200 : 404,

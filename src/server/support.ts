@@ -2,11 +2,10 @@ import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { getDb } from "@/lib/db";
 import { toSupportTicket, type SupportTicketRecord } from "@/lib/models/support";
-import { listAuditLogs, logAuditEvent } from "@/server/audit";
 
 export const listSupportTickets = createServerFn({ method: "GET" }).handler(async () => {
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const tickets = await db
     .collection<SupportTicketRecord>("support_tickets")
@@ -28,6 +27,7 @@ export const createSupportTicket = createServerFn({ method: "POST" })
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const user = await db.collection("users").findOne({ clerkId: userId });
     const userName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User";
@@ -44,6 +44,7 @@ export const createSupportTicket = createServerFn({ method: "POST" })
       updatedAt: now,
     });
 
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: userName,
       action: "Opened support ticket",
@@ -52,5 +53,3 @@ export const createSupportTicket = createServerFn({ method: "POST" })
 
     return { ticketNumber };
   });
-
-export { listAuditLogs };

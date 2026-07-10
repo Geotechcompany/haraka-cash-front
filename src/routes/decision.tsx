@@ -20,33 +20,67 @@ const decisionSearchSchema = z.object({
 export const Route = createFileRoute("/decision")({
   validateSearch: decisionSearchSchema,
   head: () => ({ meta: [{ title: "Your decision — HarakaCash" }] }),
-  loader: async ({ search }) => {
-    if (!search.applicationId) {
+  loaderDeps: ({ search }) => ({ applicationId: search?.applicationId }),
+  loader: async ({ deps }) => {
+    if (!deps.applicationId) {
       return { application: null, user: null };
     }
-    const [application, user] = await Promise.all([
-      getApplication({ data: search.applicationId }),
-      getCurrentUser(),
-    ]);
-    return { application, user };
+    try {
+      const [application, user] = await Promise.all([
+        getApplication({ data: deps.applicationId }),
+        getCurrentUser(),
+      ]);
+      return { application, user };
+    } catch {
+      return { application: null, user: null };
+    }
   },
   component: DecisionPage,
 });
 
 function DecisionPage() {
   const navigate = useNavigate();
+  const { applicationId } = Route.useSearch();
   const { application, user } = Route.useLoaderData();
   const payFee = useServerFn(initiateProcessingFeePayment);
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [paying, setPaying] = useState(false);
 
-  if (!application?.quote) {
+  if (!applicationId) {
     return (
       <AppShell>
         <div className="max-w-xl mx-auto text-center">
-          <h1 className="text-2xl font-bold">No application found</h1>
+          <h1 className="text-2xl font-bold">No application selected</h1>
           <p className="mt-3 text-muted-foreground">Start a new application to see your decision.</p>
           <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/apply">Apply for a loan</Link></Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!application) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold">Application not found</h1>
+          <p className="mt-3 text-muted-foreground">
+            We could not find an application with that reference. It may have expired or the link is incorrect.
+          </p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/apply">Apply for a loan</Link></Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!application.quote) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold">Decision pending</h1>
+          <p className="mt-3 text-muted-foreground">
+            Your application is still being processed. Check back shortly or visit your dashboard.
+          </p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/dashboard">Go to dashboard</Link></Button>
         </div>
       </AppShell>
     );
