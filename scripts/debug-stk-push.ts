@@ -1,7 +1,4 @@
-import { config as loadEnv } from "dotenv";
-import { existsSync } from "node:fs";
 import { lookup } from "node:dns/promises";
-import { resolve } from "node:path";
 
 import {
   buildStkPushBody,
@@ -9,12 +6,11 @@ import {
   getSmplyPayConfigSummary,
   initiateProcessingFeeStkPush,
   normalizeKenyanPhone,
-} from "../src/lib/smply-pay";
+} from "../src/lib/smply-pay.server";
+import { loadProjectEnv } from "./load-env";
 
-for (const file of [".env", ".ENV"]) {
-  const path = resolve(process.cwd(), file);
-  if (existsSync(path)) loadEnv({ path, override: false });
-}
+const envSummary = loadProjectEnv();
+console.log("Env files:", envSummary.join("; "));
 
 type CliArgs = {
   phone?: string;
@@ -151,10 +147,21 @@ async function probeStkEndpoints(
   clientId?: string,
 ) {
   const paths = [
-    "/v1/provider-one",
-    "/v1/provider-one/",
+    "/api/v1/provider-one/externalc2b",
+    "/api/v1/provider-one/externalc2b/",
+    "/api/v1/provider-one/stkpush",
+    "/api/v1/provider-one/stk-push",
+    "/api/v1/provider-one/lipanampesa",
+    "/api/v1/provider-one/mpesa",
+    "/api/v1/provider-one/c2b",
+    "/v1/provider-one/externalc2b",
+    "/api/v1/provider-one/externalstk",
+    "/api/v1/provider-one/externalstk/",
+    "/v1/provider-one/externalstk",
     "/api/v1/provider-one",
     "/api/v1/provider-one/",
+    "/v1/provider-one",
+    "/v1/provider-one/",
     "/api/v1/provider_one",
     "/api/v1/stk-push/smplypay",
     "/api/v1/stk-push",
@@ -205,37 +212,47 @@ async function probeWithdrawEndpoints(
   }
 }
 
-async function testWalletEndpoint(baseUrl: string, walletPath: string) {
-  const url = `${baseUrl}${walletPath}`;
-  console.log(`\nWallet probe: GET ${url}`);
-  try {
-    const response = await fetch(url, {
-      headers: {
-        ...getSmplyAuthHeaders(),
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
-    const text = await response.text();
-    console.log(`  HTTP ${response.status}: ${text.slice(0, 240)}`);
-    if (response.status === 404) {
-      fail("Wallet route not found — set SMPLY_PAY_WALLET_PATH to the path from SMPLY Pay docs.");
-      return false;
+async function probeWalletEndpoints(baseUrl: string, configuredPath: string) {
+  const paths = [
+    configuredPath,
+    "/api/v1/provider-one/balance",
+    "/api/v1/provider-one/wallet",
+    "/api/v1/wallet/balance",
+    "/v1/wallet/balance",
+    "/v1/provider-one/balance",
+    "/v1/provider-one/wallet",
+  ];
+  const uniquePaths = [...new Set(paths)];
+
+  console.log("\nWallet probe (GET, client_id+api_key):");
+  let found = false;
+  for (const path of uniquePaths) {
+    const url = `${baseUrl}${path}`;
+    try {
+      const response = await fetch(url, {
+        headers: {
+          ...getSmplyAuthHeaders(),
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const text = await response.text();
+      const short = text.slice(0, 160).replace(/\s+/g, " ");
+      console.log(`  ${path} → HTTP ${response.status}: ${short}`);
+      if (response.status !== 404) {
+        found = true;
+        pass(`Non-404 wallet response for ${path}`);
+      }
+    } catch (error) {
+      console.log(
+        `  ${path} → error: ${error instanceof Error ? error.message : "request failed"}`,
+      );
     }
-    if (response.status === 401 || response.status === 403) {
-      fail("Auth rejected — verify SMPLY_PAY_API_KEY with SMPLY Pay support.");
-      return false;
-    }
-    if (response.ok) {
-      pass("Wallet endpoint responded OK");
-      return true;
-    }
-    fail(`Wallet endpoint returned HTTP ${response.status}`);
-    return false;
-  } catch (error) {
-    fail(error instanceof Error ? error.message : "Wallet probe failed");
-    return false;
   }
+  if (!found) {
+    fail("All probed wallet paths returned 404 — set SMPLY_PAY_WALLET_PATH from SMPLY Pay support.");
+  }
+  return found;
 }
 
 async function main() {
@@ -272,7 +289,7 @@ async function main() {
   if (config.authStyle === "client-id" && !config.clientIdSet) {
     console.log("\nSkipping wallet probe — set SMPLY_PAY_CLIENT_ID for client-id auth.");
   } else {
-    await testWalletEndpoint(config.baseUrl, config.paths.wallet);
+    await probeWalletEndpoints(config.baseUrl, config.paths.wallet);
   }
 
   const phone = args.phone ? normalizeKenyanPhone(args.phone) : "254700000000";

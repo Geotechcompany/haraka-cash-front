@@ -1,11 +1,9 @@
-import "@/lib/server-only";
-
 // api.smplypay.com does not resolve; SMPLY Pay serves API from the main domain.
 const DEFAULT_BASE_URL = "https://smplypay.com";
 
 const DEFAULT_PATHS = {
   wallet: "/v1/wallet/balance",
-  stk: "/api/v1/provider-one",
+  stk: "/api/v1/provider-one/externalstk",
   withdraw: "/api/v1/provider-one/externalb2c",
 } as const;
 

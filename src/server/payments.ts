@@ -9,13 +9,6 @@ import {
   type PaymentRecord,
   type PaymentStatus,
 } from "@/lib/models/payment";
-import {
-  getSmplyWalletBalance,
-  initiateProcessingFeeStkPush,
-  initiateSmplyWithdrawal,
-  normalizeKenyanPhone,
-  parseSmplyWebhook,
-} from "@/lib/smply-pay";
 
 async function requireUserId() {
   const { userId } = await auth();
@@ -29,6 +22,7 @@ async function requireAdmin() {
 
 export const getWalletBalance = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
+  const { getSmplyWalletBalance } = await import("@/lib/smply-pay.server");
   const balance = await getSmplyWalletBalance();
   return balance;
 });
@@ -87,6 +81,7 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
     if (!fee || fee <= 0) throw new Error("Processing fee is not available for this application");
 
     const reference = paymentReference("FEE");
+    const { normalizeKenyanPhone, initiateProcessingFeeStkPush } = await import("@/lib/smply-pay.server");
     const phone = normalizeKenyanPhone(data.phone);
     const now = new Date();
 
@@ -138,6 +133,7 @@ export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const reference = paymentReference("WD");
+    const { normalizeKenyanPhone, initiateSmplyWithdrawal } = await import("@/lib/smply-pay.server");
     const phone = normalizeKenyanPhone(data.phone);
     const now = new Date();
 
@@ -207,6 +203,7 @@ async function markApplicationDisbursing(applicationNumber: string) {
 }
 
 export async function handleSmplyPayWebhook(payload: unknown) {
+  const { parseSmplyWebhook } = await import("@/lib/smply-pay.server");
   const parsed = parseSmplyWebhook(payload);
   if (!parsed.reference) return { ok: false, reason: "Missing payment reference" };
 
