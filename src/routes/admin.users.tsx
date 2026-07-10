@@ -3,14 +3,19 @@ import { Search, Users } from "lucide-react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { APPLICATIONS } from "@/lib/mock";
 import { kes } from "@/lib/loan";
+import { listApplications } from "@/server/applications";
 
 export const Route = createFileRoute("/admin/users")({
   head: () => ({ meta: [{ title: "Users — Admin" }] }),
-  component: () => {
-    const users = Array.from(new Map(APPLICATIONS.map((a) => [a.applicant, a])).values());
-    return (
+  loader: () => listApplications({ data: { scope: "all" } }),
+  component: AdminUsersPage,
+});
+
+function AdminUsersPage() {
+  const applications = Route.useLoaderData();
+  const users = Array.from(new Map(applications.map((a) => [a.applicant, a])).values());
+  return (
       <AdminShell title="Users" subtitle={`${users.length} unique borrowers`}>
         <div className="relative mb-4 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -40,5 +45,4 @@ export const Route = createFileRoute("/admin/users")({
         )}
       </AdminShell>
     );
-  },
-});
+}

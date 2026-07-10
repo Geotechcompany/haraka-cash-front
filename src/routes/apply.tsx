@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, Upload, Sparkles, CheckCircle2 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -11,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { kes, loanQuote } from "@/lib/loan";
 import { cn } from "@/lib/utils";
+import { createApplication, getCurrentUser } from "@/server/applications";
 
 export const Route = createFileRoute("/apply")({
   head: () => ({ meta: [{ title: "Apply for a loan — HarakaCash" }] }),
+  loader: () => getCurrentUser(),
   component: ApplyPage,
 });
 
@@ -26,19 +29,34 @@ const steps = [
 ] as const;
 
 function ApplyPage() {
+  const user = Route.useLoaderData();
   const navigate = useNavigate();
+  const createApplicationFn = useServerFn(createApplication);
   const [step, setStep] = useState(0);
-  const [amount, setAmount] = useState(15000);
+  const [amount, setAmount] = useState(10000);
   const [months, setMonths] = useState(3);
+  const [submitting, setSubmitting] = useState(false);
 
   const quote = useMemo(() => loanQuote(amount, months), [amount, months]);
 
   const next = () => setStep((s) => (s < steps.length - 1 ? s + 1 : s));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
-  const submit = () => {
-    sessionStorage.setItem("haraka:quote", JSON.stringify(quote));
-    navigate({ to: "/assessment" });
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const application = await createApplicationFn({
+        data: {
+          amount,
+          months,
+          purpose: "Personal",
+          quote,
+        },
+      });
+      navigate({ to: "/assessment", search: { applicationId: application.id } });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -85,10 +103,10 @@ function ApplyPage() {
 
                 {step === 0 && (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Full name" placeholder="Wanjiru Mwangi" defaultValue="Wanjiru Mwangi" />
-                    <Field label="National ID" placeholder="12345678" defaultValue="29348571" />
-                    <Field label="Phone" placeholder="0712 345 678" defaultValue="0712 345 678" />
-                    <Field label="M-Pesa number" placeholder="0712 345 678" defaultValue="0712 345 678" />
+                    <Field label="Full name" placeholder="Your full name" defaultValue={user?.name ?? ""} />
+                    <Field label="National ID" placeholder="12345678" />
+                    <Field label="Phone" placeholder="07xx xxx xxx" defaultValue={user?.phone ?? ""} />
+                    <Field label="M-Pesa number" placeholder="07xx xxx xxx" defaultValue={user?.phone ?? ""} />
                   </div>
                 )}
 
@@ -100,18 +118,18 @@ function ApplyPage() {
                         <SelectContent>{["Employed", "Self-employed", "Business owner", "Contract", "Casual"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <Field label="Employer" defaultValue="Safaricom PLC" />
-                    <Field label="Job title" defaultValue="Sales Executive" />
-                    <Field label="Years at employer" type="number" defaultValue="3" />
+                    <Field label="Employer" placeholder="Company name" />
+                    <Field label="Job title" placeholder="Your role" />
+                    <Field label="Years at employer" type="number" placeholder="0" />
                   </div>
                 )}
 
                 {step === 2 && (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Monthly income (KES)" type="number" defaultValue="65000" />
-                    <Field label="Monthly expenses (KES)" type="number" defaultValue="28000" />
-                    <Field label="Existing loans (KES)" type="number" defaultValue="0" />
-                    <Field label="Rent / mortgage (KES)" type="number" defaultValue="12000" />
+                    <Field label="Monthly income (KES)" type="number" placeholder="0" />
+                    <Field label="Monthly expenses (KES)" type="number" placeholder="0" />
+                    <Field label="Existing loans (KES)" type="number" placeholder="0" />
+                    <Field label="Rent / mortgage (KES)" type="number" placeholder="0" />
                   </div>
                 )}
 
@@ -146,22 +164,15 @@ function ApplyPage() {
                 )}
 
                 {step === 4 && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      { title: "National ID", desc: "Front & back photo" },
-                      { title: "Selfie", desc: "For identity verification" },
-                      { title: "Payslip", desc: "Most recent" },
-                      { title: "Bank statement", desc: "Last 3 months" },
-                    ].map((d) => (
-                      <button key={d.title} type="button" className="card-soft p-5 text-left hover:border-primary hover:shadow-elevated transition-all group">
-                        <div className="h-10 w-10 rounded-xl bg-primary-soft text-primary grid place-items-center group-hover:scale-105 transition-transform">
-                          <Upload className="h-5 w-5" />
-                        </div>
-                        <p className="mt-3 font-semibold">{d.title}</p>
-                        <p className="text-xs text-muted-foreground">{d.desc}</p>
-                        <p className="mt-2 text-xs text-primary font-medium">Click to upload</p>
-                      </button>
-                    ))}
+                  <div className="grid gap-3">
+                    <button type="button" className="card-soft p-5 text-left hover:border-primary hover:shadow-elevated transition-all group">
+                      <div className="h-10 w-10 rounded-xl bg-primary-soft text-primary grid place-items-center group-hover:scale-105 transition-transform">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <p className="mt-3 font-semibold">National ID</p>
+                      <p className="text-xs text-muted-foreground">Front & back photo</p>
+                      <p className="mt-2 text-xs text-primary font-medium">Click to upload</p>
+                    </button>
                   </div>
                 )}
               </motion.div>
@@ -173,7 +184,7 @@ function ApplyPage() {
                 {step < steps.length - 1 ? (
                   <Button onClick={next} className="rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft">Continue <ArrowRight className="ml-1 h-4 w-4" /></Button>
                 ) : (
-                  <Button onClick={submit} className="rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft"><Sparkles className="mr-1 h-4 w-4" /> Submit application</Button>
+                  <Button disabled={submitting} onClick={submit} className="rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft"><Sparkles className="mr-1 h-4 w-4" /> {submitting ? "Submitting..." : "Submit application"}</Button>
                 )}
               </div>
             </div>

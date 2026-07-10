@@ -14,7 +14,7 @@ export function AuthLayout({
         <Logo />
         <div className="relative max-w-md">
           <p className="text-3xl font-bold leading-tight">"HarakaCash gave me the working capital I needed within 5 minutes."</p>
-          <p className="mt-4 text-sm opacity-80">— Wanjiru, small business owner in Nairobi</p>
+          <p className="mt-4 text-sm opacity-80">— Small business owner, Nairobi</p>
         </div>
         <div className="relative text-xs opacity-70">© HarakaCash · Nairobi, Kenya</div>
       </div>

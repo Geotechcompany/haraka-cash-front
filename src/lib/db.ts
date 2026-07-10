@@ -1,0 +1,42 @@
+import { MongoClient, type Db } from "mongodb";
+
+const DB_NAME = process.env.MONGODB_DB ?? "harakacash";
+
+declare global {
+  var __mongoClient: MongoClient | undefined;
+}
+
+export async function getDb(): Promise<Db> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error("MONGODB_URI is not configured");
+  }
+
+  if (!globalThis.__mongoClient) {
+    globalThis.__mongoClient = new MongoClient(uri);
+    await globalThis.__mongoClient.connect();
+  }
+
+  return globalThis.__mongoClient.db(DB_NAME);
+}
+
+export async function ensureIndexes() {
+  const db = await getDb();
+
+  await Promise.all([
+    db.collection("applications").createIndex({ applicationNumber: 1 }, { unique: true }),
+    db.collection("applications").createIndex({ clerkUserId: 1, createdAt: -1 }),
+    db.collection("applications").createIndex({ status: 1 }),
+    db.collection("users").createIndex({ clerkId: 1 }, { unique: true }),
+    db.collection("notifications").createIndex({ clerkUserId: 1, createdAt: -1 }),
+    db.collection("loan_history").createIndex({ clerkUserId: 1 }, { unique: true }),
+    db.collection("analytics").createIndex({ key: 1 }, { unique: true }),
+    db.collection("payments").createIndex({ reference: 1 }, { unique: true }),
+    db.collection("payments").createIndex({ kind: 1, createdAt: -1 }),
+    db.collection("payments").createIndex({ applicationNumber: 1 }),
+    db.collection("payments").createIndex({ clerkUserId: 1, createdAt: -1 }),
+    db.collection("audit_logs").createIndex({ createdAt: -1 }),
+    db.collection("support_tickets").createIndex({ ticketNumber: 1 }, { unique: true }),
+    db.collection("support_tickets").createIndex({ updatedAt: -1 }),
+  ]);
+}

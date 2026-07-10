@@ -1,31 +1,54 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { AuthLayout } from "@/components/auth/auth-layout";
-import { Button } from "@/components/ui/button";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/otp")({
   head: () => ({ meta: [{ title: "Verify OTP — HarakaCash" }] }),
-  component: () => {
-    const [v, setV] = useState("");
-    const navigate = useNavigate();
+  component: OtpPage,
+});
+
+function OtpPage() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
     return (
-      <AuthLayout title="Verify your phone" subtitle="Enter the 6-digit code we sent to +254 712 345 678.">
-        <form onSubmit={(e) => { e.preventDefault(); if (v.length === 6) { toast.success("Verified"); navigate({ to: "/dashboard" }); } }} className="space-y-6">
-          <div className="flex justify-center">
-            <InputOTP maxLength={6} value={v} onChange={setV}>
-              <InputOTPGroup>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <InputOTPSlot key={i} index={i} className="h-12 w-12 text-lg rounded-xl" />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-          <Button className="w-full h-11 rounded-xl gradient-brand text-white font-semibold" disabled={v.length < 6}>Verify</Button>
-          <p className="text-center text-sm text-muted-foreground">Didn't get it? <button type="button" className="text-primary font-semibold hover:underline">Resend code</button></p>
-        </form>
+      <AuthLayout title="Verify your account" subtitle="Loading verification status...">
+        <div className="flex min-h-[12rem] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
       </AuthLayout>
     );
-  },
-});
+  }
+
+  if (isSignedIn) {
+    return <Navigate to="/dashboard" />;
+  }
+
+  return (
+    <AuthLayout
+      title="Verify your account"
+      subtitle="Complete sign-up to finish email or phone verification."
+      footer={
+        <>
+          Back to{" "}
+          <Link to="/register" className="font-semibold text-primary">
+            sign up
+          </Link>
+        </>
+      }
+    >
+      <div className="rounded-2xl border bg-primary-soft/40 p-6 text-center">
+        <p className="font-semibold">Verification is handled during sign-up</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Clerk sends and verifies your one-time code as part of account creation.
+        </p>
+        <Link
+          to="/register"
+          className="mt-4 inline-flex items-center justify-center rounded-xl gradient-brand px-5 py-2.5 text-sm font-semibold text-white shadow-soft"
+        >
+          Continue sign up
+        </Link>
+      </div>
+    </AuthLayout>
+  );
+}

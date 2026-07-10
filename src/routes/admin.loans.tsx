@@ -2,12 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { StatCard } from "@/components/ui-extras/stat-card";
 import { Banknote, TrendingUp, Clock, AlertTriangle } from "lucide-react";
-import { APPLICATIONS } from "@/lib/mock";
 import { kes } from "@/lib/loan";
+import { listApplications } from "@/server/applications";
 
 export const Route = createFileRoute("/admin/loans")({
   head: () => ({ meta: [{ title: "Loans — Admin" }] }),
-  component: () => (
+  loader: () => listApplications({ data: { scope: "all" } }),
+  component: AdminLoansPage,
+});
+
+function AdminLoansPage() {
+  const applications = Route.useLoaderData();
+  const active = applications.filter((a) => a.status === "Approved" || a.status === "Disbursing");
+  return (
     <AdminShell title="Loans" subtitle="Portfolio overview and active loan book.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Outstanding" value={kes(4_820_000)} icon={Banknote} tone="primary" />
@@ -27,7 +34,7 @@ export const Route = createFileRoute("/admin/loans")({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {APPLICATIONS.filter((a) => a.status !== "Declined").slice(0, 12).map((a) => (
+            {active.slice(0, 12).map((a) => (
               <tr key={a.id} className="hover:bg-muted/30">
                 <td className="px-6 py-4 font-mono text-xs">{a.id}</td>
                 <td className="px-6 py-4">{a.applicant}</td>
@@ -40,5 +47,5 @@ export const Route = createFileRoute("/admin/loans")({
         </table>
       </div>
     </AdminShell>
-  ),
-});
+  );
+}

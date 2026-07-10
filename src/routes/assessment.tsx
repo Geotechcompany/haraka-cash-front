@@ -1,29 +1,48 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
-import { ASSESSMENT_STEPS } from "@/lib/mock";
+import { ASSESSMENT_STEPS } from "@/lib/assessment-steps";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { runAssessment } from "@/server/applications";
+
+const assessmentSearchSchema = z.object({
+  applicationId: z.string().optional(),
+});
 
 export const Route = createFileRoute("/assessment")({
+  validateSearch: assessmentSearchSchema,
   head: () => ({ meta: [{ title: "Reviewing your application — HarakaCash" }, { name: "robots", content: "noindex" }] }),
   component: AssessmentPage,
 });
 
 function AssessmentPage() {
+  const { applicationId } = Route.useSearch();
   const [current, setCurrent] = useState(0);
+  const [finishing, setFinishing] = useState(false);
   const navigate = useNavigate();
+  const runAssessmentFn = useServerFn(runAssessment);
 
   useEffect(() => {
-    if (current >= ASSESSMENT_STEPS.length) {
-      const t = setTimeout(() => navigate({ to: "/decision" }), 800);
-      return () => clearTimeout(t);
+    if (current >= ASSESSMENT_STEPS.length && !finishing) {
+      setFinishing(true);
+      const finish = async () => {
+        if (applicationId) {
+          await runAssessmentFn({ data: applicationId });
+        }
+        navigate({ to: "/decision", search: { applicationId } });
+      };
+      void finish();
+      return;
     }
+
     const t = setTimeout(() => setCurrent((c) => c + 1), 900 + Math.random() * 600);
     return () => clearTimeout(t);
-  }, [current, navigate]);
+  }, [applicationId, current, finishing, navigate, runAssessmentFn]);
 
   const progress = Math.min(100, (current / ASSESSMENT_STEPS.length) * 100);
 

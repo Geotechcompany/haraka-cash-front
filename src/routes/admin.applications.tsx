@@ -5,12 +5,13 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { APPLICATIONS } from "@/lib/mock";
 import { kes } from "@/lib/loan";
 import { cn } from "@/lib/utils";
+import { listApplications } from "@/server/applications";
 
 export const Route = createFileRoute("/admin/applications")({
   head: () => ({ meta: [{ title: "Applications — Admin" }] }),
+  loader: () => listApplications({ data: { scope: "all" } }),
   component: ApplicationsPage,
 });
 
@@ -23,9 +24,10 @@ const statusStyles: Record<string, string> = {
 };
 
 function ApplicationsPage() {
+  const applications = Route.useLoaderData();
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
-  const rows = APPLICATIONS.filter((a) =>
+  const rows = applications.filter((a) =>
     (tab === "all" || a.status.toLowerCase() === tab) &&
     (a.applicant.toLowerCase().includes(q.toLowerCase()) || a.id.toLowerCase().includes(q.toLowerCase()))
   );

@@ -107,23 +107,23 @@ function Landing() {
               <div className="relative rounded-[2.5rem] border-8 border-foreground/90 bg-card shadow-elevated overflow-hidden aspect-[9/19]">
                 <div className="p-5 h-full flex flex-col gap-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Good morning</span>
-                    <span className="h-8 w-8 rounded-full gradient-brand grid place-items-center text-white text-xs font-semibold">WM</span>
+                    <span className="text-xs text-muted-foreground">Your dashboard</span>
+                    <span className="h-8 w-8 rounded-full gradient-brand grid place-items-center text-white text-xs font-semibold">HC</span>
                   </div>
                   <div className="rounded-2xl gradient-brand p-4 text-white shadow-soft">
                     <p className="text-[11px] uppercase tracking-wide opacity-80">Available credit</p>
-                    <p className="mt-1 text-3xl font-bold tabular-nums">{kes(45000)}</p>
+                    <p className="mt-1 text-3xl font-bold tabular-nums">Apply to see</p>
                     <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: "72%" }} transition={{ delay: 0.6, duration: 1 }} className="h-full bg-white" />
+                      <motion.div initial={{ width: 0 }} animate={{ width: "60%" }} transition={{ delay: 0.6, duration: 1 }} className="h-full bg-white" />
                     </div>
-                    <p className="mt-2 text-xs opacity-80">Eligibility score · 72 / 100</p>
+                    <p className="mt-2 text-xs opacity-80">Eligibility score after assessment</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { l: "Active loan", v: kes(15000) },
-                      { l: "Due in", v: "12 days" },
-                      { l: "Repaid", v: kes(9000) },
-                      { l: "Fee", v: kes(250) },
+                      { l: "Active loan", v: "—" },
+                      { l: "Due in", v: "—" },
+                      { l: "Repaid", v: "—" },
+                      { l: "Fee", v: "Shown upfront" },
                     ].map((c) => (
                       <div key={c.l} className="rounded-xl border p-3">
                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.l}</p>
@@ -249,9 +249,9 @@ function Landing() {
           </div>
           <div className="mt-12 grid md:grid-cols-3 gap-4">
             {[
-              { n: "Wanjiru M.", t: "Nairobi", q: "Got KES 25,000 for stock in under 5 minutes. Fees were exactly what they said." },
-              { n: "Otieno K.", t: "Kisumu", q: "The app is so clean. I love that I see the total payable before accepting." },
-              { n: "Achieng W.", t: "Mombasa", q: "HarakaCash saved me when school fees were due. Repayment was smooth." },
+              { n: "Borrower", t: "Nairobi", q: "Got a loan for stock in under 5 minutes. Fees were exactly what they said." },
+              { n: "Borrower", t: "Kisumu", q: "The app is so clean. I see the total payable before accepting." },
+              { n: "Borrower", t: "Mombasa", q: "HarakaCash saved me when school fees were due. Repayment was smooth." },
             ].map((r) => (
               <div key={r.n} className="card-soft p-6">
                 <div className="flex gap-0.5 text-warning">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>

@@ -1,34 +1,88 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles } from "lucide-react";
+import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles, Smartphone } from "lucide-react";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { kes, loanQuote } from "@/lib/loan";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { kes } from "@/lib/loan";
 import { toast } from "sonner";
+import { getApplication, getCurrentUser } from "@/server/applications";
+import { initiateProcessingFeePayment } from "@/server/payments";
+
+const decisionSearchSchema = z.object({
+  applicationId: z.string().optional(),
+});
 
 export const Route = createFileRoute("/decision")({
+  validateSearch: decisionSearchSchema,
   head: () => ({ meta: [{ title: "Your decision — HarakaCash" }] }),
+  loader: async ({ search }) => {
+    if (!search.applicationId) {
+      return { application: null, user: null };
+    }
+    const [application, user] = await Promise.all([
+      getApplication({ data: search.applicationId }),
+      getCurrentUser(),
+    ]);
+    return { application, user };
+  },
   component: DecisionPage,
 });
 
 function DecisionPage() {
   const navigate = useNavigate();
-  const [quote, setQuote] = useState(loanQuote(15000, 3));
-  const approved = quote.amount <= 100000; // demo: always approved in normal ranges
+  const { application, user } = Route.useLoaderData();
+  const payFee = useServerFn(initiateProcessingFeePayment);
+  const [phone, setPhone] = useState(user?.phone ?? "");
+  const [paying, setPaying] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const raw = sessionStorage.getItem("haraka:quote");
-      if (raw) try { setQuote(JSON.parse(raw)); } catch {}
-    }
-  }, []);
+  if (!application?.quote) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold">No application found</h1>
+          <p className="mt-3 text-muted-foreground">Start a new application to see your decision.</p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/apply">Apply for a loan</Link></Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const quote = application.quote;
+  const approved = application.status === "Approved";
 
   const schedule = Array.from({ length: quote.months }).map((_, i) => ({
     n: i + 1,
     date: new Date(Date.now() + (i + 1) * 30 * 86400000).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" }),
     amount: quote.monthly,
   }));
+
+  const handleAccept = async () => {
+    if (!application?.id) {
+      toast.error("Application not found");
+      return;
+    }
+
+    setPaying(true);
+    try {
+      const result = await payFee({
+        data: {
+          applicationNumber: application.id,
+          phone,
+        },
+      });
+      toast.success(result.message);
+      navigate({ to: "/loans" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to initiate M-Pesa payment");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   if (!approved) {
     return (
@@ -69,7 +123,7 @@ function DecisionPage() {
           <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6 text-3xl md:text-4xl font-bold tracking-tight">
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
-          <p className="mt-3 text-muted-foreground">Review the offer below. Accepting sends funds straight to your M-Pesa.</p>
+          <p className="mt-3 text-muted-foreground">Pay the processing fee via M-Pesa STK Push to release your loan.</p>
         </div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8 rounded-3xl gradient-brand text-white p-8 shadow-elevated">
@@ -88,6 +142,26 @@ function DecisionPage() {
             ))}
           </div>
         </motion.div>
+
+        <div className="mt-6 card-soft p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Smartphone className="h-4 w-4 text-primary" />
+            <p className="font-semibold">Pay processing fee via M-Pesa</p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            We will send an STK push for {kes(quote.fee)}. Enter your M-Pesa PIN on your phone to accept the offer and start disbursement.
+          </p>
+          <div className="mt-4 space-y-1.5">
+            <Label htmlFor="mpesa-phone">M-Pesa number</Label>
+            <Input
+              id="mpesa-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="0712 345 678"
+              className="h-11 rounded-xl"
+            />
+          </div>
+        </div>
 
         <div className="mt-6 card-soft p-6">
           <div className="flex items-center gap-2">
@@ -109,8 +183,12 @@ function DecisionPage() {
 
         <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
           <Button variant="outline" className="rounded-xl h-12 flex-1" onClick={() => navigate({ to: "/dashboard" })}>Reject offer</Button>
-          <Button className="rounded-xl h-12 flex-1 gradient-brand text-white font-semibold shadow-soft" onClick={() => { toast.success("Offer accepted — disbursing to M-Pesa"); navigate({ to: "/loans" }); }}>
-            Accept offer <ArrowRight className="ml-1 h-4 w-4" />
+          <Button
+            disabled={paying || !phone.trim()}
+            className="rounded-xl h-12 flex-1 gradient-brand text-white font-semibold shadow-soft"
+            onClick={handleAccept}
+          >
+            {paying ? "Sending STK push..." : <>Pay fee & accept <ArrowRight className="ml-1 h-4 w-4" /></>}
           </Button>
         </div>
       </div>

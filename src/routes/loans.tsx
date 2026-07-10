@@ -6,12 +6,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { APPLICATIONS } from "@/lib/mock";
 import { kes } from "@/lib/loan";
 import { cn } from "@/lib/utils";
+import { listApplications } from "@/server/applications";
 
 export const Route = createFileRoute("/loans")({
   head: () => ({ meta: [{ title: "My loans — HarakaCash" }] }),
+  loader: () => listApplications({ data: { scope: "mine" } }),
   component: LoansPage,
 });
 
@@ -24,9 +25,11 @@ const statusStyles: Record<string, string> = {
 };
 
 function LoansPage() {
+  const applications = Route.useLoaderData();
+  const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
-  const filtered = APPLICATIONS.filter((a) =>
+  const filtered = applications.filter((a) =>
     (tab === "all" || a.status.toLowerCase() === tab) &&
     (a.id.toLowerCase().includes(q.toLowerCase()) || a.purpose.toLowerCase().includes(q.toLowerCase()))
   );
@@ -41,29 +44,30 @@ function LoansPage() {
         <Button asChild className="rounded-xl h-11 gradient-brand text-white shadow-soft"><Link to="/apply"><Plus className="mr-1 h-4 w-4" /> New loan</Link></Button>
       </div>
 
-      {/* Active loan timeline */}
-      <div className="card-soft p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Active loan</p>
-            <p className="text-2xl font-bold tabular-nums">{kes(15000)}</p>
+      {activeLoan && (
+        <div className="card-soft p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Active loan</p>
+              <p className="text-2xl font-bold tabular-nums">{kes(activeLoan.amount)}</p>
+            </div>
+            <span className="text-xs font-semibold text-primary bg-primary-soft rounded-full px-3 py-1">{activeLoan.status}</span>
           </div>
-          <span className="text-xs font-semibold text-primary bg-primary-soft rounded-full px-3 py-1">Disbursed</span>
+          <ol className="grid sm:grid-cols-4 gap-3">
+            {[
+              { l: "Pending Review", done: true, icon: CheckCircle2 },
+              { l: "Approved", done: activeLoan.status !== "Pending", icon: CheckCircle2 },
+              { l: "Disbursed", done: activeLoan.status === "Disbursing" || activeLoan.status === "Approved", icon: CheckCircle2 },
+              { l: "Repayment", done: false, icon: Clock },
+            ].map((s, i) => (
+              <li key={i} className={cn("rounded-xl border p-3", s.done ? "bg-success/5 border-success/30" : "bg-muted/30")}>
+                <s.icon className={cn("h-4 w-4", s.done ? "text-success" : "text-muted-foreground")} />
+                <p className="mt-2 text-xs font-semibold">{s.l}</p>
+              </li>
+            ))}
+          </ol>
         </div>
-        <ol className="grid sm:grid-cols-4 gap-3">
-          {[
-            { l: "Pending Review", done: true, icon: CheckCircle2 },
-            { l: "Approved", done: true, icon: CheckCircle2 },
-            { l: "Disbursed", done: true, icon: CheckCircle2 },
-            { l: "Repayment", done: false, icon: Clock },
-          ].map((s, i) => (
-            <li key={i} className={cn("rounded-xl border p-3", s.done ? "bg-success/5 border-success/30" : "bg-muted/30")}>
-              <s.icon className={cn("h-4 w-4", s.done ? "text-success" : "text-muted-foreground")} />
-              <p className="mt-2 text-xs font-semibold">{s.l}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">

@@ -3,11 +3,13 @@ import { motion } from "motion/react";
 import { Bell, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { NOTIFICATIONS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { listNotifications, markAllNotificationsRead } from "@/server/notifications";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/notifications")({
   head: () => ({ meta: [{ title: "Notifications — HarakaCash" }] }),
+  loader: () => listNotifications(),
   component: NotificationsPage,
 });
 
@@ -19,6 +21,9 @@ const tone = {
 };
 
 function NotificationsPage() {
+  const notifications = Route.useLoaderData();
+  const markRead = useServerFn(markAllNotificationsRead);
+
   return (
     <AppShell>
       <div className="max-w-3xl mx-auto">
@@ -27,11 +32,11 @@ function NotificationsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
             <p className="mt-1 text-muted-foreground">Loan updates, offers and reminders.</p>
           </div>
-          <Button variant="outline" size="sm" className="rounded-xl">Mark all read</Button>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => markRead()}>Mark all read</Button>
         </div>
 
         <div className="card-soft divide-y">
-          {NOTIFICATIONS.map((n, i) => {
+          {notifications.map((n, i) => {
             const Icon = icon[n.type];
             return (
               <motion.div key={n.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
@@ -52,7 +57,7 @@ function NotificationsPage() {
           })}
         </div>
 
-        {NOTIFICATIONS.length === 0 && (
+        {notifications.length === 0 && (
           <div className="text-center py-20">
             <Bell className="mx-auto h-10 w-10 text-muted-foreground" />
             <p className="mt-3 font-semibold">You're all caught up</p>

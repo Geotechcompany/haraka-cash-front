@@ -1,13 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { MONTHLY_LOAN_VOLUME } from "@/lib/mock";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { getMonthlyLoanVolume } from "@/server/analytics";
 
 export const Route = createFileRoute("/admin/reports")({
   head: () => ({ meta: [{ title: "Reports — Admin" }] }),
-  component: () => (
+  loader: () => getMonthlyLoanVolume(),
+  component: AdminReportsPage,
+});
+
+function AdminReportsPage() {
+  const monthlyVolume = Route.useLoaderData();
+  return (
     <AdminShell title="Reports" subtitle="Download portfolio and compliance reports.">
       <div className="grid gap-4 md:grid-cols-3 mb-6">
         {["Monthly disbursement report", "Repayment performance", "Fees & revenue"].map((r) => (
@@ -22,7 +28,7 @@ export const Route = createFileRoute("/admin/reports")({
         <p className="font-semibold">Monthly applications</p>
         <div className="mt-4 h-72">
           <ResponsiveContainer>
-            <BarChart data={MONTHLY_LOAN_VOLUME}>
+            <BarChart data={monthlyVolume}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
               <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs" />
               <YAxis tickLine={false} axisLine={false} className="text-xs" />
@@ -33,5 +39,5 @@ export const Route = createFileRoute("/admin/reports")({
         </div>
       </div>
     </AdminShell>
-  ),
-});
+  );
+}

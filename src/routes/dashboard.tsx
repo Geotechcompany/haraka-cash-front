@@ -10,11 +10,23 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { kes } from "@/lib/loan";
-import { APPLICATIONS, USER_LOAN_HISTORY, NOTIFICATIONS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { getCurrentUser, listApplications } from "@/server/applications";
+import { getDashboardStats, getUserLoanHistory } from "@/server/analytics";
+import { listNotifications } from "@/server/notifications";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HarakaCash" }] }),
+  loader: async () => {
+    const [user, applications, notifications, loanHistory, stats] = await Promise.all([
+      getCurrentUser(),
+      listApplications({ data: { scope: "mine" } }),
+      listNotifications(),
+      getUserLoanHistory(),
+      getDashboardStats(),
+    ]);
+    return { user, applications, notifications, loanHistory, stats };
+  },
   component: Dashboard,
 });
 
@@ -27,7 +39,9 @@ const statusStyles: Record<string, string> = {
 };
 
 function Dashboard() {
-  const recent = APPLICATIONS.slice(0, 5);
+  const { user, applications, notifications, loanHistory, stats } = Route.useLoaderData();
+  const recent = applications.slice(0, 5);
+  const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
   return (
     <AppShell>
       {/* Welcome */}
@@ -35,19 +49,19 @@ function Dashboard() {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 rounded-3xl gradient-brand text-white p-6 md:p-8 shadow-elevated relative overflow-hidden">
           <div className="absolute -top-20 -right-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden />
           <p className="text-sm opacity-80">Good morning,</p>
-          <h1 className="text-2xl md:text-3xl font-bold mt-1">Wanjiru Mwangi</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mt-1">{user?.name ?? "HarakaCash user"}</h1>
           <div className="mt-6 grid grid-cols-2 gap-6">
             <div>
               <p className="text-xs uppercase tracking-wide opacity-70">Available credit</p>
-              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">{kes(45000)}</p>
+              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">{kes(user?.availableCredit ?? 0)}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide opacity-70">Eligibility score</p>
-              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">72<span className="text-lg opacity-70">/100</span></p>
+              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">{user?.eligibilityScore ?? 0}<span className="text-lg opacity-70">/100</span></p>
             </div>
           </div>
           <div className="mt-4 h-1.5 rounded-full bg-white/25 overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: "72%" }} transition={{ delay: 0.3, duration: 1 }} className="h-full bg-white" />
+            <motion.div initial={{ width: 0 }} animate={{ width: `${user?.eligibilityScore ?? 0}%` }} transition={{ delay: 0.3, duration: 1 }} className="h-full bg-white" />
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             <Button asChild size="lg" className="rounded-xl bg-white text-primary hover:bg-white/90 font-semibold">
@@ -60,28 +74,36 @@ function Dashboard() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-soft p-6">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold">Current loan</p>
-            <Badge variant="secondary" className="rounded-full">Active</Badge>
-          </div>
-          <p className="text-3xl font-bold mt-3 tabular-nums">{kes(15000)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Repay by 12 Oct 2026</p>
-          <div className="mt-4">
-            <div className="flex justify-between text-xs mb-1.5"><span>Repaid {kes(9000)}</span><span>60%</span></div>
-            <Progress value={60} className="h-2" />
-          </div>
-          <Button asChild variant="outline" className="mt-4 w-full rounded-xl">
-            <Link to="/loans">Repay early</Link>
-          </Button>
+          {activeLoan ? (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="font-semibold">Current loan</p>
+                <Badge variant="secondary" className="rounded-full">{activeLoan.status}</Badge>
+              </div>
+              <p className="text-3xl font-bold mt-3 tabular-nums">{kes(activeLoan.amount)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{activeLoan.months} month term · {activeLoan.purpose}</p>
+              <Button asChild variant="outline" className="mt-4 w-full rounded-xl">
+                <Link to="/loans">View loan</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">No active loan</p>
+              <p className="text-sm text-muted-foreground mt-2">Apply for a loan to see your current balance here.</p>
+              <Button asChild className="mt-4 w-full rounded-xl gradient-brand text-white">
+                <Link to="/apply"><Plus className="mr-1 h-4 w-4" /> Apply now</Link>
+              </Button>
+            </>
+          )}
         </motion.div>
       </div>
 
       {/* Stat cards */}
       <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending" value="1" icon={Clock} tone="warning" delay={0} />
-        <StatCard label="Approved" value="8" icon={CheckCircle2} tone="success" delay={0.05} />
-        <StatCard label="Completed" value="12" icon={Wallet} tone="primary" delay={0.1} />
-        <StatCard label="Declined" value="1" icon={AlertCircle} tone="danger" delay={0.15} />
+        <StatCard label="Pending" value={String(stats.pending)} icon={Clock} tone="warning" delay={0} />
+        <StatCard label="Approved" value={String(stats.approved)} icon={CheckCircle2} tone="success" delay={0.05} />
+        <StatCard label="Completed" value={String(stats.completed)} icon={Wallet} tone="primary" delay={0.1} />
+        <StatCard label="Declined" value={String(stats.declined)} icon={AlertCircle} tone="danger" delay={0.15} />
       </div>
 
       {/* Charts */}
@@ -96,7 +118,7 @@ function Dashboard() {
           </div>
           <div className="mt-4 h-56">
             <ResponsiveContainer>
-              <AreaChart data={USER_LOAN_HISTORY}>
+              <AreaChart data={loanHistory}>
                 <defs>
                   <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.4} />
@@ -117,7 +139,7 @@ function Dashboard() {
           <p className="text-xs text-muted-foreground">Borrowed vs repaid</p>
           <div className="mt-4 h-56">
             <ResponsiveContainer>
-              <BarChart data={USER_LOAN_HISTORY}>
+              <BarChart data={loanHistory}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs" />
                 <YAxis hide />
@@ -165,7 +187,7 @@ function Dashboard() {
             <Button asChild variant="ghost" size="sm"><Link to="/notifications">All</Link></Button>
           </div>
           <ul className="mt-3 space-y-3">
-            {NOTIFICATIONS.slice(0, 4).map((n) => (
+            {notifications.slice(0, 4).map((n) => (
               <li key={n.id} className="flex gap-3">
                 <div className={cn("h-2 w-2 rounded-full mt-2 shrink-0", n.unread ? "bg-primary" : "bg-muted")} />
                 <div className="min-w-0">
@@ -183,9 +205,9 @@ function Dashboard() {
       <div className="mt-6 card-soft p-6 flex flex-col md:flex-row items-start md:items-center gap-4">
         <div className="flex-1 min-w-0">
           <p className="font-semibold">Complete your profile</p>
-          <p className="text-sm text-muted-foreground">You're 80% done. Upload your payslip to unlock higher loan limits.</p>
+          <p className="text-sm text-muted-foreground">Complete your profile to unlock higher loan limits.</p>
           <div className="mt-3">
-            <Progress value={80} className="h-2" />
+            <Progress value={user?.profileComplete ?? 0} className="h-2" />
           </div>
         </div>
         <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
