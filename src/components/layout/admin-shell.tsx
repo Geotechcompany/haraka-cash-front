@@ -8,7 +8,8 @@ import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { cn } from "@/lib/utils";
 
-const items = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+const items: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/applications", label: "Applications", icon: FileText },
   { to: "/admin/users", label: "Users", icon: Users },
@@ -19,7 +20,7 @@ const items = [
   { to: "/admin/audit", label: "Audit Logs", icon: ScrollText },
   { to: "/admin/support", label: "Support", icon: LifeBuoy },
   { to: "/admin/settings", label: "Settings", icon: Settings },
-] as const;
+];
 
 export function AdminShell({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
