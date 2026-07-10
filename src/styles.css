@@ -115,6 +115,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.16 0.02 264);
   --foreground: oklch(0.97 0.005 258);
 
@@ -179,6 +180,41 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* Clerk auth: hide footer branding when appearance API is bypassed */
+.cl-footer,
+.cl-footerAction,
+.cl-footerPages,
+.cl-footerItem {
+  display: none !important;
+}
+
+/* Clerk auth: dark mode input text, placeholders, and control icons */
+.dark .cl-formFieldInput input,
+.dark .cl-input,
+.dark .cl-phoneInputInput,
+.dark .cl-otpCodeFieldInput {
+  color: #f5f6f8;
+}
+
+.dark .cl-formFieldInput input::placeholder,
+.dark .cl-input::placeholder,
+.dark .cl-phoneInputInput::placeholder {
+  color: #b4bac5;
+  opacity: 1;
+}
+
+.dark .cl-formFieldInputShowPasswordButton,
+.dark .cl-phoneInputCountrySelector button,
+.dark .cl-selectButton {
+  color: #b4bac5;
+}
+
+.dark .cl-formFieldInputShowPasswordButton:hover,
+.dark .cl-phoneInputCountrySelector button:hover,
+.dark .cl-selectButton:hover {
+  color: #f5f6f8;
 }
 
 @layer base {

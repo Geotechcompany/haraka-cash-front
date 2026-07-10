@@ -2,7 +2,6 @@ import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { getDb } from "@/lib/db";
 import type { ApplicationRecord } from "@/lib/models/application";
 import {
   paymentReference,
@@ -36,6 +35,7 @@ export const getWalletBalance = createServerFn({ method: "GET" }).handler(async 
 
 export const listPaymentTransactions = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const payments = await db
     .collection<PaymentRecord>("payments")
@@ -71,6 +71,7 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
   .validator((data: unknown) => processingFeeInput.parse(data))
   .handler(async ({ data }) => {
     const clerkUserId = await requireUserId();
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const application = await db.collection<ApplicationRecord>("applications").findOne({
       applicationNumber: data.applicationNumber,
@@ -134,6 +135,7 @@ export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
   .validator((data: unknown) => withdrawInput.parse(data))
   .handler(async ({ data }) => {
     await requireAdmin();
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const reference = paymentReference("WD");
     const phone = normalizeKenyanPhone(data.phone);
@@ -173,6 +175,7 @@ export const getPaymentStatus = createServerFn({ method: "GET" })
   .validator((reference: string) => z.string().min(1).parse(reference))
   .handler(async ({ data: reference }) => {
     const clerkUserId = await requireUserId();
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const payment = await db.collection<PaymentRecord>("payments").findOne({
       reference,
@@ -183,6 +186,7 @@ export const getPaymentStatus = createServerFn({ method: "GET" })
   });
 
 async function markApplicationDisbursing(applicationNumber: string) {
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   await db.collection<ApplicationRecord>("applications").updateOne(
     { applicationNumber },
@@ -206,6 +210,7 @@ export async function handleSmplyPayWebhook(payload: unknown) {
   const parsed = parseSmplyWebhook(payload);
   if (!parsed.reference) return { ok: false, reason: "Missing payment reference" };
 
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const payment = await db.collection<PaymentRecord>("payments").findOne({
     reference: parsed.reference,

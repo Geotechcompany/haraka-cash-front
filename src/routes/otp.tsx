@@ -10,17 +10,7 @@ export const Route = createFileRoute("/otp")({
 function OtpPage() {
   const { isLoaded, isSignedIn } = useAuth();
 
-  if (!isLoaded) {
-    return (
-      <AuthLayout title="Verify your account" subtitle="Loading verification status...">
-        <div className="flex min-h-[12rem] items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
-      </AuthLayout>
-    );
-  }
-
-  if (isSignedIn) {
+  if (isLoaded && isSignedIn) {
     return <Navigate to="/dashboard" />;
   }
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ClerkProvider } from "@clerk/tanstack-react-start";
+import { ThemedClerkProvider } from "@/components/auth/clerk-provider";
 import {
   Outlet,
   Link,
@@ -11,7 +11,6 @@ import {
 import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { clerkAppearance } from "@/lib/clerk-appearance";
 import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -90,9 +89,9 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head><HeadContent /></head>
       <body>
-        <ClerkProvider appearance={clerkAppearance}>
-          {children}
-        </ClerkProvider>
+        <ThemeProvider>
+          <ThemedClerkProvider>{children}</ThemedClerkProvider>
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
@@ -101,12 +100,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <Outlet />
-        <Toaster position="top-center" richColors />
-      </ThemeProvider>
+      <Outlet />
+      <Toaster position="top-center" richColors />
     </QueryClientProvider>
   );
 }

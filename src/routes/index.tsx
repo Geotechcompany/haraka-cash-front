@@ -73,7 +73,7 @@ function Landing() {
         <div className="absolute -top-40 -right-40 h-[520px] w-[520px] rounded-full gradient-brand opacity-20 blur-3xl" aria-hidden />
         <div className="absolute top-40 -left-40 h-[420px] w-[420px] rounded-full bg-secondary-foreground/10 blur-3xl" aria-hidden />
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-20 md:pt-24 md:pb-32 grid lg:grid-cols-2 gap-12 items-center relative">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+          <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
               <Sparkles className="h-3.5 w-3.5 text-primary" /> Trusted by 120,000+ Kenyans
             </span>
@@ -101,7 +101,7 @@ function Landing() {
           </motion.div>
 
           {/* Hero visual: phone mock */}
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.15 }} className="relative">
+          <motion.div initial={false} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.15 }} className="relative">
             <div className="relative mx-auto w-full max-w-sm">
               <div className="absolute -inset-6 gradient-brand opacity-20 blur-3xl rounded-[3rem]" aria-hidden />
               <div className="relative rounded-[2.5rem] border-8 border-foreground/90 bg-card shadow-elevated overflow-hidden aspect-[9/19]">
@@ -112,22 +112,22 @@ function Landing() {
                   </div>
                   <div className="rounded-2xl gradient-brand p-4 text-white shadow-soft">
                     <p className="text-[11px] uppercase tracking-wide opacity-80">Available credit</p>
-                    <p className="mt-1 text-3xl font-bold tabular-nums">Apply to see</p>
+                    <p className="mt-1 text-3xl font-bold tabular-nums">{kes(45000)}</p>
                     <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: "60%" }} transition={{ delay: 0.6, duration: 1 }} className="h-full bg-white" />
+                      <motion.div initial={false} animate={{ width: "72%" }} transition={{ delay: 0.6, duration: 1 }} className="h-full bg-white" />
                     </div>
-                    <p className="mt-2 text-xs opacity-80">Eligibility score after assessment</p>
+                    <p className="mt-2 text-xs opacity-80">Eligibility score 72/100</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { l: "Active loan", v: "—" },
-                      { l: "Due in", v: "—" },
-                      { l: "Repaid", v: "—" },
-                      { l: "Fee", v: "Shown upfront" },
+                      { l: "Active loan", v: kes(15000) },
+                      { l: "Due in", v: "12 days" },
+                      { l: "Repaid", v: kes(9000) },
+                      { l: "Fee", v: kes(250) },
                     ].map((c) => (
                       <div key={c.l} className="rounded-xl border p-3">
                         <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.l}</p>
-                        <p className="text-sm font-semibold mt-0.5">{c.v}</p>
+                        <p className="text-sm font-semibold mt-0.5 tabular-nums">{c.v}</p>
                       </div>
                     ))}
                   </div>
@@ -143,14 +143,14 @@ function Landing() {
                 </div>
               </div>
               <motion.div
-                initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.9 }}
+                initial={false} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.9 }}
                 className="absolute -left-6 top-16 hidden sm:flex items-center gap-2 rounded-2xl bg-card border shadow-soft px-3 py-2"
               >
                 <Clock className="h-4 w-4 text-primary" />
                 <span className="text-xs font-medium">Approved in 12s</span>
               </motion.div>
               <motion.div
-                initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 }}
+                initial={false} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 }}
                 className="absolute -right-4 bottom-24 hidden sm:flex items-center gap-2 rounded-2xl bg-card border shadow-soft px-3 py-2"
               >
                 <TrendingUp className="h-4 w-4 text-success" />
@@ -171,7 +171,7 @@ function Landing() {
         <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((f, i) => (
             <motion.div key={f.title}
-              initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
               transition={{ delay: i * 0.05, duration: 0.4 }}
               className="card-soft p-6 hover:shadow-elevated transition-shadow"
             >
@@ -195,7 +195,7 @@ function Landing() {
           <ol className="mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {steps.map((s, i) => (
               <motion.li key={s}
-                initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
                 transition={{ delay: i * 0.05 }}
                 className="card-soft p-5 flex items-start gap-4"
               >

@@ -1,21 +1,9 @@
-import { getDb } from "@/lib/db";
+import { createServerFn } from "@tanstack/react-start";
+
 import { toAuditLog, type AuditLogRecord } from "@/lib/models/audit";
 
-export async function logAuditEvent(input: {
-  actor: string;
-  action: string;
-  target: string;
-}) {
-  const db = await getDb();
-  await db.collection<AuditLogRecord>("audit_logs").insertOne({
-    actor: input.actor,
-    action: input.action,
-    target: input.target,
-    createdAt: new Date(),
-  });
-}
-
-export async function listAuditLogs() {
+export const listAuditLogs = createServerFn({ method: "GET" }).handler(async () => {
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const logs = await db
     .collection<AuditLogRecord>("audit_logs")
@@ -24,4 +12,4 @@ export async function listAuditLogs() {
     .limit(100)
     .toArray();
   return logs.map(toAuditLog);
-}
+});

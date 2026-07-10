@@ -5,7 +5,16 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 
+const isNetlify = process.env.NETLIFY === "true";
+
 export default defineConfig({
+  ssr: {
+    external: ["mongodb", "bson"],
+    noExternal: ["@clerk/tanstack-react-start", "@clerk/react", "@clerk/shared"],
+  },
+  optimizeDeps: {
+    exclude: ["mongodb", "bson"],
+  },
   plugins: [
     tsConfigPaths(),
     tailwindcss(),
@@ -13,7 +22,9 @@ export default defineConfig({
       server: { entry: "server" },
     }),
     viteReact(),
-    nitro(),
+    nitro({
+      preset: isNetlify ? "netlify" : "node-server",
+    }),
   ],
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-query"],

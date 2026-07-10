@@ -1,6 +1,6 @@
-import { SignUp } from "@clerk/tanstack-react-start";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { ClerkSignUp } from "@/components/auth/clerk-auth-form";
 import { RedirectIfSignedIn } from "@/components/auth/auth-redirect";
 
 export const Route = createFileRoute("/register")({
@@ -23,11 +23,10 @@ function RegisterPage() {
           </>
         }
       >
-        <SignUp
+        <ClerkSignUp
           routing="virtual"
           signInUrl="/login"
           fallbackRedirectUrl="/dashboard"
-          forceRedirectUrl="/dashboard"
         />
       </AuthLayout>
     </RedirectIfSignedIn>

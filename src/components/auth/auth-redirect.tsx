@@ -11,15 +11,7 @@ export function RedirectIfSignedIn({
 }) {
   const { isLoaded, isSignedIn } = useAuth();
 
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-[12rem] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (isSignedIn) {
+  if (isLoaded && isSignedIn) {
     return <Navigate to={to} />;
   }
 

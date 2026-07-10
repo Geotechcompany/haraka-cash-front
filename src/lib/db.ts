@@ -1,3 +1,5 @@
+import "@/lib/server-only";
+
 import { MongoClient, type Db } from "mongodb";
 
 const DB_NAME = process.env.MONGODB_DB ?? "harakacash";

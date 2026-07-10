@@ -1,11 +1,11 @@
 import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 
-import { getDb } from "@/lib/db";
 import { toNotification, type NotificationRecord } from "@/lib/models/notification";
 
 export const listNotifications = createServerFn({ method: "GET" }).handler(async () => {
   const { userId } = await auth();
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const filter = userId ? { clerkUserId: userId } : {};
 
@@ -23,6 +23,7 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" }).handl
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   await db.collection("notifications").updateMany(
     { clerkUserId: userId, unread: true },

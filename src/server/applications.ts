@@ -2,7 +2,6 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { getDb } from "@/lib/db";
 import {
   nextApplicationNumber,
   toApplication,
@@ -10,7 +9,6 @@ import {
   type ApplicationStatus,
 } from "@/lib/models/application";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
-import { logAuditEvent } from "@/server/audit";
 
 async function requireUserId() {
   const { userId } = await auth();
@@ -19,6 +17,7 @@ async function requireUserId() {
 }
 
 async function ensureUser(clerkId: string) {
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const existing = await db.collection<UserRecord>("users").findOne({ clerkId });
   if (existing) return existing;
@@ -59,6 +58,7 @@ const listApplicationsInput = z
 export const listApplications = createServerFn({ method: "GET" })
   .validator((data: unknown) => listApplicationsInput.parse(data))
   .handler(async ({ data }) => {
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const scope = data?.scope ?? "mine";
     const filter =
@@ -78,6 +78,7 @@ export const listApplications = createServerFn({ method: "GET" })
 export const getApplication = createServerFn({ method: "GET" })
   .validator((id: string) => z.string().min(1).parse(id))
   .handler(async ({ data: applicationNumber }) => {
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const doc = await db
       .collection<ApplicationRecord>("applications")
@@ -109,6 +110,7 @@ export const createApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const clerkUserId = await requireUserId();
     const user = await ensureUser(clerkUserId);
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const now = new Date();
     const count = await db.collection("applications").countDocuments();
@@ -135,6 +137,7 @@ export const createApplication = createServerFn({ method: "POST" })
     };
 
     await db.collection<ApplicationRecord>("applications").insertOne(doc);
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: applicant,
       action: "Submitted application",
@@ -156,6 +159,7 @@ export const runAssessment = createServerFn({ method: "POST" })
   .validator((id: string) => z.string().min(1).parse(id))
   .handler(async ({ data: applicationNumber }) => {
     const clerkUserId = await requireUserId();
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const doc = await db.collection<ApplicationRecord>("applications").findOne({
       applicationNumber,
@@ -182,6 +186,7 @@ export const runAssessment = createServerFn({ method: "POST" })
       },
     );
 
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: "credit-engine",
       action: approved ? "Approved application" : "Declined application",
@@ -210,11 +215,13 @@ export const updateApplicationStatus = createServerFn({ method: "POST" })
   .validator((data: unknown) => updateStatusInput.parse(data))
   .handler(async ({ data }) => {
     await requireUserId();
+    const { getDb } = await import("@/lib/db");
     const db = await getDb();
     await db.collection<ApplicationRecord>("applications").updateOne(
       { applicationNumber: data.applicationNumber },
       { $set: { status: data.status, updatedAt: new Date() } },
     );
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: "admin",
       action: `Set status to ${data.status}`,
