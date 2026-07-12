@@ -186,9 +186,14 @@ function Landing() {
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Available credit
                     </p>
-                    <p className="mt-2 font-display text-[2rem] font-bold leading-none tracking-tight tabular-nums text-foreground">
+                    <motion.p
+                      className="mt-2 font-display text-[2rem] font-bold leading-none tracking-tight tabular-nums text-foreground"
+                      initial={reduceMotion ? false : { y: 8 }}
+                      animate={{ y: 0 }}
+                      transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.12 }}
+                    >
                       {kes(45000)}
-                    </p>
+                    </motion.p>
                     <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
                       <motion.div
                         className="h-full origin-left rounded-full gradient-brand"
@@ -319,22 +324,42 @@ function Landing() {
 
       <section id="faq" className="border-t bg-muted/25">
         <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <h2 className="font-display text-center text-3xl font-bold tracking-tight sm:text-4xl">
+          <motion.h2
+            initial={reduceMotion ? false : { y: 12 }}
+            whileInView={{ y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={springEnter}
+            className="font-display text-center text-3xl font-bold tracking-tight sm:text-4xl"
+          >
             Before you apply
-          </h2>
+          </motion.h2>
           <Accordion type="single" collapsible className="mt-10">
             {faqs.map((item, index) => (
-              <AccordionItem key={item.q} value={`faq-${index}`} className="border-b">
-                <AccordionTrigger className="text-left font-semibold">{item.q}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
-              </AccordionItem>
+              <motion.div
+                key={item.q}
+                initial={reduceMotion ? false : { y: 10 }}
+                whileInView={{ y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ ...springEnter, delay: reduceMotion ? 0 : index * 0.05 }}
+              >
+                <AccordionItem value={`faq-${index}`} className="border-b">
+                  <AccordionTrigger className="text-left font-semibold">{item.q}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
+                </AccordionItem>
+              </motion.div>
             ))}
           </Accordion>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:pb-24">
-        <div className="landing-hero-plane relative overflow-hidden rounded-[1.75rem] px-8 py-12 text-white shadow-elevated sm:px-12 sm:py-16">
+        <motion.div
+          initial={reduceMotion ? false : { y: 12 }}
+          whileInView={{ y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={springEnter}
+          className="landing-hero-plane relative overflow-hidden rounded-[1.75rem] px-8 py-12 text-white shadow-elevated sm:px-12 sm:py-16"
+        >
           <h2 className="font-display max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
             Borrow what you need. Repay on your schedule.
           </h2>
@@ -346,7 +371,7 @@ function Landing() {
               Create account <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
-        </div>
+        </motion.div>
       </section>
 
       <footer className="border-t">

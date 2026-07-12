@@ -1,5 +1,3 @@
-import "@/lib/server-only";
-
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import type { PaymentKind, PaymentRecord } from "@/lib/models/payment";
