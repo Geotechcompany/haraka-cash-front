@@ -207,12 +207,6 @@ function DecisionPage() {
         },
       });
 
-      if (result.status === "success") {
-        toast.success(result.message);
-        await router.invalidate();
-        return;
-      }
-
       if (result.status === "failed") {
         toast.error(result.message);
         setPaying(false);
