@@ -1,9 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "motion/react";
-import {
-  ArrowRight, Zap, ShieldCheck, Gauge, Wallet, Sparkles, CheckCircle2,
-  Smartphone, Lock, Clock, TrendingUp, Star,
-} from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowRight } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -13,225 +10,290 @@ import { kes } from "@/lib/loan";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "HarakaCash — Fast Digital Loans for Every Kenyan" },
-      { name: "description", content: "Apply for instant digital loans in minutes. Transparent fees, fast decisions, secure disbursement to M-Pesa." },
+      { title: "HarakaCash — Loans to M-Pesa in minutes" },
+      {
+        name: "description",
+        content:
+          "Borrow up to KES 250,000 with clear fees, instant decisions, and payout to M-Pesa. Built for Kenya.",
+      },
+      { property: "og:title", content: "HarakaCash — Loans to M-Pesa in minutes" },
+      {
+        property: "og:description",
+        content: "Clear fees. Instant decisions. Payout to M-Pesa.",
+      },
+      { property: "og:image", content: "/logo.png" },
     ],
   }),
   component: Landing,
 });
 
-const features = [
-  { icon: Zap, title: "Instant Application", body: "Complete your loan request in under 3 minutes on any device." },
-  { icon: Gauge, title: "Automated Review", body: "Decisions in seconds using a responsible affordability engine." },
-  { icon: ShieldCheck, title: "Secure Verification", body: "Bank-grade encryption and ID checks protect every application." },
-  { icon: Wallet, title: "Transparent Fees", body: "Know the processing fee and total payable before you accept." },
-  { icon: Smartphone, title: "Fast Disbursement", body: "Funds sent straight to your M-Pesa or bank account." },
-  { icon: Lock, title: "Data Privacy", body: "Your information is never shared without your consent." },
+const steps = [
+  { title: "Apply", body: "Tell us how much you need and for how long." },
+  { title: "Decide", body: "We check affordability and return an offer on the spot." },
+  { title: "Get paid", body: "Funds land on your M-Pesa after you accept." },
 ];
 
-const steps = [
-  "Create Account",
-  "Verify Details",
-  "Apply for a Loan",
-  "Automated Assessment",
-  "Instant Decision",
-  "Accept the Offer",
-  "Ready for Disbursement",
-];
+const feeRows = [
+  [5000, 150],
+  [10000, 250],
+  [20000, 500],
+  [50000, 1000],
+  [100000, 2000],
+] as const;
 
 const faqs = [
-  { q: "How much can I borrow?", a: "First-time borrowers can access up to KES 20,000. Your limit grows to KES 250,000 as you build a repayment history with HarakaCash." },
-  { q: "How fast is disbursement?", a: "Approved loans are disbursed to M-Pesa or your bank within 5 minutes of you accepting the offer." },
-  { q: "What are the fees?", a: "A one-time processing fee is shown transparently before you accept. Fees range from KES 150 for a KES 5,000 loan to KES 2,000 for a KES 100,000 loan." },
-  { q: "Do you contact a credit bureau?", a: "HarakaCash runs a responsible internal affordability and eligibility assessment. We do not claim live access to any regulated credit bureau in this demo." },
-  { q: "What happens if I repay late?", a: "A late fee applies and it can affect your future eligibility. We send reminders in advance to help you stay on track." },
+  {
+    q: "How much can I borrow?",
+    a: "First loans go up to KES 20,000. Limits climb toward KES 250,000 as you repay on time.",
+  },
+  {
+    q: "How fast is disbursement?",
+    a: "After you accept and pay the processing fee, funds usually reach M-Pesa within five minutes.",
+  },
+  {
+    q: "What are the fees?",
+    a: "One processing fee, shown before you accept. Example: KES 150 on a KES 5,000 loan; KES 2,000 on a KES 100,000 loan.",
+  },
+  {
+    q: "Do you pull a credit bureau file?",
+    a: "We run an internal affordability check. This product does not claim live bureau access.",
+  },
+  {
+    q: "What if I repay late?",
+    a: "A late fee applies and future limits can shrink. We send reminders before the due date.",
+  },
 ];
 
+const springEnter = { type: "spring" as const, bounce: 0, duration: 0.45 };
+const springSoft = { type: "spring" as const, bounce: 0, duration: 0.55 };
+
 function Landing() {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div className="min-h-dvh bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-30 glass">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-          <Logo />
-          <nav className="hidden md:flex items-center gap-1 ml-8 text-sm">
-            <a href="#features" className="px-3 py-2 text-muted-foreground hover:text-foreground rounded-lg">Features</a>
-            <a href="#how" className="px-3 py-2 text-muted-foreground hover:text-foreground rounded-lg">How it works</a>
-            <a href="#fees" className="px-3 py-2 text-muted-foreground hover:text-foreground rounded-lg">Fees</a>
-            <a href="#faq" className="px-3 py-2 text-muted-foreground hover:text-foreground rounded-lg">FAQ</a>
+    <div className="min-h-dvh bg-background font-sans">
+      <header className="sticky top-0 z-30 glass border-b border-white/10">
+        <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          <Logo height={52} className="max-w-[260px]" />
+          <nav className="ml-8 hidden items-center gap-1 text-sm md:flex" aria-label="Primary">
+            <a href="#how" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              How it works
+            </a>
+            <a href="#fees" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              Fees
+            </a>
+            <a href="#faq" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              FAQ
+            </a>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" asChild className="hidden sm:inline-flex"><Link to="/login">Sign in</Link></Button>
-            <Button asChild className="rounded-xl gradient-brand text-white shadow-soft"><Link to="/register">Get started</Link></Button>
+            <Button variant="ghost" asChild className="hidden sm:inline-flex">
+              <Link to="/login">Sign in</Link>
+            </Button>
+            <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
+              <Link to="/register">Apply</Link>
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-[520px] w-[520px] rounded-full gradient-brand opacity-20 blur-3xl" aria-hidden />
-        <div className="absolute top-40 -left-40 h-[420px] w-[420px] rounded-full bg-secondary-foreground/10 blur-3xl" aria-hidden />
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-20 md:pt-24 md:pb-32 grid lg:grid-cols-2 gap-12 items-center relative">
-          <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> Trusted by 120,000+ Kenyans
-            </span>
-            <h1 className="mt-5 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-              Fast digital loans<br />
-              for every <span className="text-gradient-brand">Kenyan.</span>
+      {/* One composition: brand + headline + line + CTAs + full-bleed product plane */}
+      <section className="relative min-h-[min(92dvh,920px)] overflow-hidden landing-hero-plane text-white">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E\")",
+          }}
+          aria-hidden
+        />
+
+        <div className="relative mx-auto grid min-h-[min(92dvh,920px)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-0 lg:px-8 lg:py-24">
+          <motion.div
+            className="relative z-10 max-w-xl"
+            initial={reduceMotion ? false : { y: 18 }}
+            animate={{ y: 0 }}
+            transition={springEnter}
+          >
+            <h1 className="font-display text-[clamp(2.4rem,6vw,4.25rem)] font-extrabold leading-[1.02] tracking-[-0.03em]">
+              Cash on M-Pesa
+              <br />
+              before lunch.
             </h1>
-            <p className="mt-5 text-lg text-muted-foreground max-w-lg">
-              Apply in minutes. Receive instant decisions. Transparent processing fees.
-              Direct to your M-Pesa or bank account.
+            <p className="mt-5 max-w-md text-base leading-relaxed text-white/85 sm:text-lg">
+              Apply in minutes. See your offer upfront. Get paid when you confirm on your phone.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-xl gradient-brand text-white h-12 px-6 text-base shadow-soft">
-                <Link to="/register">Apply now <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              <Button
+                asChild
+                size="lg"
+                className="h-12 rounded-xl bg-white px-6 text-base font-semibold text-[oklch(0.35_0.16_258)] shadow-elevated hover:bg-white/95"
+              >
+                <Link to="/register">
+                  Start application <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-xl h-12 px-6 text-base">
-                <a href="#how">Learn more</a>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="h-12 rounded-xl border-white/35 bg-white/5 px-6 text-base text-white backdrop-blur-sm hover:bg-white/10 hover:text-white"
+              >
+                <a href="#how">See how it works</a>
               </Button>
-            </div>
-            <div className="mt-8 flex items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" /> No paperwork</div>
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" /> M-Pesa payout</div>
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" /> 24/7 support</div>
             </div>
           </motion.div>
 
-          {/* Hero visual: phone mock */}
-          <motion.div initial={false} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.15 }} className="relative">
-            <div className="relative mx-auto w-full max-w-sm">
-              <div className="absolute -inset-6 gradient-brand opacity-20 blur-3xl rounded-[3rem]" aria-hidden />
-              <div className="relative rounded-[2.5rem] border-8 border-foreground/90 bg-card shadow-elevated overflow-hidden aspect-[9/19]">
-                <div className="p-5 h-full flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Your dashboard</span>
-                    <span className="h-8 w-8 rounded-full gradient-brand grid place-items-center text-white text-xs font-semibold">HC</span>
+          <motion.div
+            className="relative mx-auto flex w-full max-w-[320px] items-center justify-center lg:ml-auto lg:mr-2 lg:max-w-[340px]"
+            initial={reduceMotion ? false : { y: 20 }}
+            animate={{ y: 0 }}
+            transition={springSoft}
+            aria-hidden
+          >
+            {/* Phone shell */}
+            <div className="relative w-full aspect-[9/19.2] rounded-[2.6rem] bg-[#0b0d12] p-[10px] shadow-[0_40px_80px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/40">
+              <div className="absolute inset-[3px] rounded-[2.35rem] bg-gradient-to-b from-white/15 to-transparent opacity-40 pointer-events-none" />
+              <div className="relative flex h-full flex-col overflow-hidden rounded-[2.15rem] bg-[#f4f6fb] text-[oklch(0.2_0.03_264)]">
+                {/* Status bar */}
+                <div className="relative z-10 flex items-center justify-between px-6 pt-3.5 text-[11px] font-semibold tracking-tight text-foreground">
+                  <span className="tabular-nums">9:41</span>
+                  <div className="absolute left-1/2 top-2.5 h-[22px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-3.5 rounded-[2px] border border-foreground/80">
+                      <span className="ml-[1px] mt-[1px] block h-[5px] w-2 rounded-[1px] bg-foreground/80" />
+                    </span>
                   </div>
-                  <div className="rounded-2xl gradient-brand p-4 text-white shadow-soft">
-                    <p className="text-[11px] uppercase tracking-wide opacity-80">Available credit</p>
-                    <p className="mt-1 text-3xl font-bold tabular-nums">{kes(45000)}</p>
-                    <div className="mt-3 h-1.5 rounded-full bg-white/25 overflow-hidden">
-                      <motion.div initial={false} animate={{ width: "72%" }} transition={{ delay: 0.6, duration: 1 }} className="h-full bg-white" />
+                </div>
+
+                {/* App screen */}
+                <div className="flex flex-1 flex-col px-4 pb-3 pt-4">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Today
+                    </p>
+                    <img
+                      src="/favicon-mark.png"
+                      alt=""
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 rounded-full object-cover ring-1 ring-black/5"
+                    />
+                  </div>
+
+                  <div className="mt-4 flex-1 rounded-[1.35rem] bg-white p-5 shadow-[0_12px_40px_-18px_rgba(15,23,42,0.35)]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Available credit
+                    </p>
+                    <p className="mt-2 font-display text-[2rem] font-bold leading-none tracking-tight tabular-nums text-foreground">
+                      {kes(45000)}
+                    </p>
+                    <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <motion.div
+                        className="h-full origin-left rounded-full gradient-brand"
+                        initial={reduceMotion ? { scaleX: 0.72 } : { scaleX: 0.08 }}
+                        animate={{ scaleX: 0.72 }}
+                        transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.25 }}
+                      />
                     </div>
-                    <p className="mt-2 text-xs opacity-80">Eligibility score 72/100</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { l: "Active loan", v: kes(15000) },
-                      { l: "Due in", v: "12 days" },
-                      { l: "Repaid", v: kes(9000) },
-                      { l: "Fee", v: kes(250) },
-                    ].map((c) => (
-                      <div key={c.l} className="rounded-xl border p-3">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.l}</p>
-                        <p className="text-sm font-semibold mt-0.5 tabular-nums">{c.v}</p>
+                    <p className="mt-2 text-[11px] text-muted-foreground">Eligibility 72 / 100</p>
+
+                    <div className="mt-6 space-y-3.5 border-t border-border/80 pt-5">
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-muted-foreground">Active loan</span>
+                        <span className="font-semibold tabular-nums">{kes(15000)}</span>
                       </div>
-                    ))}
-                  </div>
-                  <div className="mt-auto rounded-2xl border p-3 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-success/15 grid place-items-center">
-                      <CheckCircle2 className="h-5 w-5 text-success" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate">Loan approved</p>
-                      <p className="text-[11px] text-muted-foreground truncate">Sent to M-Pesa · just now</p>
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-muted-foreground">Due in</span>
+                        <span className="font-semibold">12 days</span>
+                      </div>
                     </div>
                   </div>
+
+                  <p className="mt-3 px-2 text-center text-[10px] leading-snug text-muted-foreground">
+                    Funds sent straight to your M-Pesa
+                  </p>
+
+                  {/* Home indicator */}
+                  <div className="mx-auto mt-auto mb-1 h-1 w-[34%] rounded-full bg-foreground/25" />
                 </div>
               </div>
-              <motion.div
-                initial={false} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.9 }}
-                className="absolute -left-6 top-16 hidden sm:flex items-center gap-2 rounded-2xl bg-card border shadow-soft px-3 py-2"
-              >
-                <Clock className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium">Approved in 12s</span>
-              </motion.div>
-              <motion.div
-                initial={false} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.1 }}
-                className="absolute -right-4 bottom-24 hidden sm:flex items-center gap-2 rounded-2xl bg-card border shadow-soft px-3 py-2"
-              >
-                <TrendingUp className="h-4 w-4 text-success" />
-                <span className="text-xs font-medium">Limit up 20%</span>
-              </motion.div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold text-primary">Why HarakaCash</p>
-          <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Built for speed. Designed for trust.</h2>
-          <p className="mt-3 text-muted-foreground">Everything you need to borrow responsibly, in one clean experience.</p>
-        </div>
-        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((f, i) => (
-            <motion.div key={f.title}
-              initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              transition={{ delay: i * 0.05, duration: 0.4 }}
-              className="card-soft p-6 hover:shadow-elevated transition-shadow"
+      <section id="how" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <motion.div
+          initial={reduceMotion ? false : { y: 12 }}
+          whileInView={{ y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={springEnter}
+          className="max-w-2xl"
+        >
+          <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            Three steps. No paperwork pile.
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            From application to M-Pesa credit in one sitting.
+          </p>
+        </motion.div>
+
+            <ol className="mt-14 grid gap-10 sm:grid-cols-3 lg:gap-8">
+          {steps.map((step, index) => (
+            <motion.li
+              key={step.title}
+              initial={reduceMotion ? false : { y: 14 }}
+              whileInView={{ y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ ...springEnter, delay: reduceMotion ? 0 : index * 0.05 }}
+              className="relative"
             >
-              <div className="h-11 w-11 rounded-xl bg-primary-soft text-primary grid place-items-center">
-                <f.icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 font-semibold text-lg">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
-            </motion.div>
+              <p className="font-display text-5xl font-extrabold tracking-tight text-primary/20 tabular-nums">
+                {String(index + 1).padStart(2, "0")}
+              </p>
+              <h3 className="mt-3 text-lg font-semibold">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+            </motion.li>
           ))}
-        </div>
+        </ol>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="bg-muted/40 border-y">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-primary">How it works</p>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">From apply to payout in minutes.</h2>
-          </div>
-          <ol className="mt-12 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {steps.map((s, i) => (
-              <motion.li key={s}
-                initial={false} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="card-soft p-5 flex items-start gap-4"
-              >
-                <span className="h-9 w-9 shrink-0 rounded-xl gradient-brand text-white grid place-items-center text-sm font-bold">{i + 1}</span>
-                <div className="min-w-0">
-                  <p className="font-semibold">{s}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Step {i + 1} of {steps.length}</p>
-                </div>
-              </motion.li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      <section id="fees" className="border-y bg-muted/35">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:items-end lg:px-8 lg:py-28">
+          <motion.div
+            initial={reduceMotion ? false : { y: 12 }}
+            whileInView={{ y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={springEnter}
+          >
+            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              One fee. Shown before you tap accept.
+            </h2>
+            <p className="mt-3 max-w-md text-muted-foreground">
+              Principal, interest, and processing fee appear in the offer screen. Nothing else gets added at payout.
+            </p>
+            <Button asChild className="mt-8 rounded-xl gradient-brand text-white shadow-soft">
+              <Link to="/register">
+                Check your offer <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </motion.div>
 
-      {/* Fees */}
-      <section id="fees" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-        <div className="grid lg:grid-cols-2 gap-10 items-start">
-          <div>
-            <p className="text-sm font-semibold text-primary">Transparent pricing</p>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">One-time processing fee. No surprises.</h2>
-            <p className="mt-3 text-muted-foreground">You'll see the full breakdown — principal, interest and processing fee — before you accept any offer.</p>
-            <Button asChild className="mt-6 rounded-xl gradient-brand text-white"><Link to="/register">Start your application</Link></Button>
-          </div>
-          <div className="card-soft overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-soft">
             <table className="w-full text-sm">
-              <thead className="bg-muted/60 text-muted-foreground">
+              <thead className="bg-muted/70 text-muted-foreground">
                 <tr>
-                  <th className="text-left font-medium px-5 py-3">Loan amount</th>
-                  <th className="text-right font-medium px-5 py-3">Processing fee</th>
+                  <th className="px-5 py-3.5 text-left font-medium">Loan amount</th>
+                  <th className="px-5 py-3.5 text-right font-medium">Processing fee</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {[[5000, 150], [10000, 250], [20000, 500], [50000, 1000], [100000, 2000]].map(([a, f]) => (
-                  <tr key={a} className="tabular-nums">
-                    <td className="px-5 py-4 font-medium">{kes(a)}</td>
-                    <td className="px-5 py-4 text-right">{kes(f)}</td>
+                {feeRows.map(([amount, fee]) => (
+                  <tr key={amount} className="tabular-nums">
+                    <td className="px-5 py-4 font-medium">{kes(amount)}</td>
+                    <td className="px-5 py-4 text-right">{kes(fee)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -240,88 +302,85 @@ function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="bg-muted/40 border-y">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-semibold text-primary">Loved across Kenya</p>
-            <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Trusted by Kenyans, from Kisumu to Mombasa.</h2>
-          </div>
-          <div className="mt-12 grid md:grid-cols-3 gap-4">
-            {[
-              { n: "Borrower", t: "Nairobi", q: "Got a loan for stock in under 5 minutes. Fees were exactly what they said." },
-              { n: "Borrower", t: "Kisumu", q: "The app is so clean. I see the total payable before accepting." },
-              { n: "Borrower", t: "Mombasa", q: "HarakaCash saved me when school fees were due. Repayment was smooth." },
-            ].map((r) => (
-              <div key={r.n} className="card-soft p-6">
-                <div className="flex gap-0.5 text-warning">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}</div>
-                <p className="mt-3 text-sm">"{r.q}"</p>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full gradient-brand text-white grid place-items-center text-sm font-semibold">{r.n[0]}</div>
-                  <div>
-                    <p className="text-sm font-semibold">{r.n}</p>
-                    <p className="text-xs text-muted-foreground">{r.t}</p>
-                  </div>
-                </div>
-              </div>
+      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <motion.blockquote
+          initial={reduceMotion ? false : { y: 12 }}
+          whileInView={{ y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={springEnter}
+          className="mx-auto max-w-3xl"
+        >
+          <p className="font-display text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">
+            “Stock money hit my M-Pesa in under five minutes. The fee matched what the screen showed.”
+          </p>
+          <footer className="mt-6 text-sm text-muted-foreground">Shop owner · Nairobi</footer>
+        </motion.blockquote>
+      </section>
+
+      <section id="faq" className="border-t bg-muted/25">
+        <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <h2 className="font-display text-center text-3xl font-bold tracking-tight sm:text-4xl">
+            Before you apply
+          </h2>
+          <Accordion type="single" collapsible className="mt-10">
+            {faqs.map((item, index) => (
+              <AccordionItem key={item.q} value={`faq-${index}`} className="border-b">
+                <AccordionTrigger className="text-left font-semibold">{item.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center">
-          <p className="text-sm font-semibold text-primary">FAQ</p>
-          <h2 className="mt-2 text-3xl sm:text-4xl font-bold tracking-tight">Questions, answered.</h2>
-        </div>
-        <Accordion type="single" collapsible className="mt-10">
-          {faqs.map((f, i) => (
-            <AccordionItem key={i} value={`i${i}`} className="border-b">
-              <AccordionTrigger className="text-left font-semibold">{f.q}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </section>
-
-      {/* CTA */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="rounded-3xl gradient-brand p-10 md:p-14 text-white shadow-elevated relative overflow-hidden">
-          <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden />
-          <h2 className="text-3xl md:text-4xl font-bold max-w-xl leading-tight">Your next loan is a few taps away.</h2>
-          <p className="mt-3 max-w-lg opacity-90">Join thousands of Kenyans borrowing responsibly with HarakaCash.</p>
-          <Button asChild size="lg" variant="secondary" className="mt-6 rounded-xl h-12 px-6 text-base">
-            <Link to="/register">Create free account <ArrowRight className="ml-1 h-4 w-4" /></Link>
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:pb-24">
+        <div className="landing-hero-plane relative overflow-hidden rounded-[1.75rem] px-8 py-12 text-white shadow-elevated sm:px-12 sm:py-16">
+          <h2 className="font-display max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
+            Borrow what you need. Repay on your schedule.
+          </h2>
+          <p className="mt-3 max-w-lg text-white/85">
+            Open an account, submit one application, and decide with the fee in plain view.
+          </p>
+          <Button asChild size="lg" className="mt-8 h-12 rounded-xl bg-white px-6 text-base font-semibold text-[oklch(0.35_0.16_258)] hover:bg-white/95">
+            <Link to="/register">
+              Create account <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
           </Button>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 grid gap-8 md:grid-cols-4">
+        <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
           <div>
-            <Logo />
-            <p className="mt-3 text-sm text-muted-foreground max-w-xs">Fast, transparent digital loans built for Kenya.</p>
+            <Logo height={52} className="max-w-[260px]" />
+            <p className="mt-3 max-w-xs text-sm text-muted-foreground">
+              Digital loans for Kenya, with M-Pesa payout and fees you can read before you accept.
+            </p>
           </div>
-          {[
-            { h: "Product", l: [["Apply", "/register"], ["Dashboard", "/dashboard"], ["Pricing", "#fees"]] },
-            { h: "Company", l: [["About", "#"], ["Careers", "#"], ["Contact", "/support"]] },
-            { h: "Legal", l: [["Terms", "#"], ["Privacy", "#"], ["Compliance", "#"]] },
-          ].map((c) => (
-            <div key={c.h}>
-              <p className="text-sm font-semibold">{c.h}</p>
+          {(
+            [
+              { heading: "Product", links: [["Apply", "/register"], ["Dashboard", "/dashboard"], ["Fees", "#fees"]] },
+              { heading: "Help", links: [["FAQ", "#faq"], ["Support", "/support"], ["Sign in", "/login"]] },
+              { heading: "Legal", links: [["Terms", "#"], ["Privacy", "#"], ["Compliance", "#"]] },
+            ] as const
+          ).map((column) => (
+            <div key={column.heading}>
+              <p className="text-sm font-semibold">{column.heading}</p>
               <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                {c.l.map(([label, href]) => (
-                  <li key={label}><a href={href} className="hover:text-foreground">{label}</a></li>
+                {column.links.map(([label, href]) => (
+                  <li key={label}>
+                    <a href={href} className="transition-colors hover:text-foreground">
+                      {label}
+                    </a>
+                  </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
         <div className="border-t">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <p>© {new Date().getFullYear()} HarakaCash. All rights reserved.</p>
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-8">
+            <p>© {new Date().getFullYear()} HarakaCash. Nairobi, Kenya.</p>
             <p>Loans subject to eligibility. Terms apply.</p>
           </div>
         </div>

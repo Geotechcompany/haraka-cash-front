@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/webhooks/smply-pay")({
           });
         }
 
-        const { handleSmplyPayWebhook } = await import("@/server/payments");
+        const { handleSmplyPayWebhook } = await import("@/server/payments-webhook.server");
         const result = await handleSmplyPayWebhook(payload);
         return new Response(JSON.stringify(result), {
           status: result.ok ? 200 : 404,

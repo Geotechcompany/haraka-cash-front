@@ -4,12 +4,17 @@ import { cn } from "@/lib/utils";
 export function Logo({
   className,
   to = "/",
-  height = 40,
+  height = 48,
+  variant = "color",
 }: {
   className?: string;
   to?: string;
   height?: number;
+  /** `white` for dark / brand-gradient surfaces */
+  variant?: "color" | "white";
 }) {
+  const src = variant === "white" ? "/logo-white.png" : "/logo.png";
+
   return (
     <Link
       to={to}
@@ -17,10 +22,11 @@ export function Logo({
       aria-label="HarakaCash home"
     >
       <img
-        src="/logo.png"
+        src={src}
         alt="Haraka Cash"
         height={height}
-        className="h-10 w-auto max-w-[180px] object-contain object-left transition-transform group-hover:scale-[1.02]"
+        width={Math.round(height * 3.5)}
+        className="w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
         style={{ height }}
       />
     </Link>

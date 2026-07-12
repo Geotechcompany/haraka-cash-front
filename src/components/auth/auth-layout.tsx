@@ -11,7 +11,7 @@ export function AuthLayout({
       <div className="relative hidden lg:flex flex-col justify-between p-10 gradient-brand text-white overflow-hidden">
         <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-white/10 blur-3xl" aria-hidden />
         <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-black/10 blur-3xl" aria-hidden />
-        <Logo />
+        <Logo variant="white" />
         <div className="relative max-w-md">
           <p className="text-3xl font-bold leading-tight">"HarakaCash gave me the working capital I needed within 5 minutes."</p>
           <p className="mt-4 text-sm opacity-80">— Small business owner, Nairobi</p>
