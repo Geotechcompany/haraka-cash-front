@@ -2,9 +2,11 @@ import { lookup } from "node:dns/promises";
 
 import {
   buildStkPushBody,
+  buildWithdrawBody,
   getSmplyAuthHeaders,
   getSmplyPayConfigSummary,
   initiateProcessingFeeStkPush,
+  initiateSmplyWithdrawal,
 } from "../src/lib/smply-pay.server";
 import { loadProjectEnv } from "./load-env";
 
@@ -16,14 +18,16 @@ type CliArgs = {
   amount: number;
   dryRun: boolean;
   probe: boolean;
+  withdraw: boolean;
 };
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { amount: 1, dryRun: false, probe: false };
+  const args: CliArgs = { amount: 1, dryRun: false, probe: false, withdraw: false };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === "--dry-run") args.dryRun = true;
     else if (token === "--probe") args.probe = true;
+    else if (token === "--withdraw") args.withdraw = true;
     else if (token === "--phone") args.phone = argv[++i];
     else if (token === "--amount") args.amount = Number(argv[++i]);
     else if (token === "--help" || token === "-h") {
@@ -31,8 +35,9 @@ function parseArgs(argv: string[]): CliArgs {
 
 Options:
   --phone <number>   M-Pesa phone (e.g. 0712345678 or 254712345678)
-  --amount <kes>     STK amount in KES (default: 1)
+  --amount <kes>     Amount in KES (default: 1)
   --dry-run          Print config + request preview without calling SMPLY Pay
+  --withdraw         Test B2C withdrawal instead of STK push
   --probe            Try common STK/withdraw paths and auth styles; report non-404 responses
 `);
       process.exit(0);
@@ -195,14 +200,11 @@ async function probeWithdrawEndpoints(
     "/v1/withdraw",
     "/api/v1/withdraw",
   ];
-  const body = {
+  const body = buildWithdrawBody({
     phone,
-    msisdn: phone,
-    amount: Math.round(amount),
+    amount,
     reference: `PROBE-WD-${Date.now()}`,
-    description: "HarakaCash withdraw probe",
-    callback_url: callbackUrl,
-  };
+  });
   const found = await probeEndpoint("Withdrawal endpoint", paths, baseUrl, apiKey, body, clientId);
   if (!found) {
     fail("All probed withdrawal paths returned 404 — confirm the route with SMPLY Pay support.");
@@ -297,14 +299,16 @@ async function main() {
 
   const phone = args.phone ?? "0700000000";
   const reference = `DEBUG-${Date.now()}`;
-  const stkBody = buildStkPushBody({
-    phone,
-    amount: args.amount,
-    reference,
-  });
+  const requestBody = args.withdraw
+    ? buildWithdrawBody({ phone, amount: args.amount, reference })
+    : buildStkPushBody({ phone, amount: args.amount, reference });
 
-  console.log(`\nSTK push target: POST ${config.stkUrl}`);
-  console.log("Request body:", JSON.stringify(stkBody, null, 2));
+  console.log(
+    `\n${args.withdraw ? "B2C withdraw" : "STK push"} target: POST ${
+      args.withdraw ? config.withdrawUrl : config.stkUrl
+    }`,
+  );
+  console.log("Request body:", JSON.stringify(requestBody, null, 2));
 
   if (args.probe) {
     const clientId = process.env.SMPLY_PAY_CLIENT_ID;
@@ -331,14 +335,38 @@ async function main() {
   }
 
   if (args.dryRun) {
-    pass("Dry run — no STK request sent");
-    console.log("\nTo send a real test STK push:");
+    pass(`Dry run — no ${args.withdraw ? "B2C" : "STK"} request sent`);
+    console.log("\nTo send a real test:");
     console.log("  npm run debug:stk -- --phone 0712345678 --amount 1");
+    console.log("  npm run debug:stk -- --withdraw --phone 0712345678 --amount 1");
+    console.log("\nWarning: --withdraw moves real wallet funds if the API accepts the request.");
     return;
   }
 
   if (!args.phone) {
-    fail("Pass --phone to send a real STK push, or use --dry-run to preview only.");
+    fail(
+      `Pass --phone to send a real ${args.withdraw ? "B2C withdrawal" : "STK push"}, or use --dry-run to preview only.`,
+    );
+    return;
+  }
+
+  if (args.withdraw) {
+    console.log("\nSending B2C withdrawal (real money if wallet has balance)...");
+    console.log("  Note: wallet balance Ksh 0 will often still return HTTP 500 from the provider.");
+    try {
+      const result = await initiateSmplyWithdrawal({
+        phone,
+        amount: args.amount,
+        reference,
+        description: "HarakaCash B2C debug",
+      });
+      pass(`B2C withdrawal accepted (status: ${result.status})`);
+      if (result.message) info("Provider message", result.message);
+      if (result.providerRef) info("Provider ref", result.providerRef);
+      console.log("\nRaw response:", JSON.stringify(result.raw, null, 2).slice(0, 500));
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "B2C withdrawal failed");
+    }
     return;
   }
 

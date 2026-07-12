@@ -62,7 +62,10 @@ function AdminPaymentsPage() {
       toast.success(result.message);
       window.location.reload();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Withdrawal failed");
+      const raw = error instanceof Error ? error.message : "Withdrawal failed";
+      // TanStack often prefixes thrown server messages with "Server Error".
+      const message = raw.replace(/^Server Error\s*/i, "").trim() || raw;
+      toast.error(message);
     } finally {
       setWithdrawing(false);
     }

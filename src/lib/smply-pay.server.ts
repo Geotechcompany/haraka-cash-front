@@ -181,22 +181,32 @@ async function smplyRequest<T>(
   }
 
   if (!response.ok) {
-    const providerMessage =
-      typeof payload === "object" &&
-      payload !== null &&
-      "message" in payload &&
-      typeof (payload as { message?: unknown }).message === "string"
-        ? (payload as { message: string }).message
-        : undefined;
-    const message =
-      providerMessage ??
-      `SMPLY Pay request failed (${response.status})`;
-    throw new Error(
-      `${message} [${method} ${url} → HTTP ${response.status}]`,
-    );
+    const providerMessage = extractProviderErrorMessage(payload);
+    const message = providerMessage ?? `SMPLY Pay request failed (${response.status})`;
+    throw new Error(`${message} [${method} ${url} → HTTP ${response.status}]`);
   }
 
   return payload as T;
+}
+
+function extractProviderErrorMessage(payload: unknown): string | undefined {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim().slice(0, 300);
+  }
+  if (!payload || typeof payload !== "object") return undefined;
+
+  const record = payload as Record<string, unknown>;
+  for (const key of ["message", "error", "detail", "ResponseDescription", "error_description"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim().slice(0, 300);
+  }
+
+  const nested = record.data ?? record.error;
+  if (nested && typeof nested === "object") {
+    return extractProviderErrorMessage(nested);
+  }
+
+  return undefined;
 }
 
 export function buildStkPushBody(input: {
@@ -204,6 +214,23 @@ export function buildStkPushBody(input: {
   amount: number;
   reference: string;
   description?: string;
+  orderCode?: string;
+  projectCode?: string;
+}) {
+  return {
+    phoneNumber: toSmplyPhoneNumber(input.phone),
+    amount: String(Math.round(input.amount)),
+    projectCode: input.projectCode ?? getProjectCode(),
+    orderCode: input.orderCode ?? "",
+    transactionId: input.reference,
+  };
+}
+
+/** Same Postman-shaped body as STK; B2C also requires projectCode. */
+export function buildWithdrawBody(input: {
+  phone: string;
+  amount: number;
+  reference: string;
   orderCode?: string;
   projectCode?: string;
 }) {
@@ -236,7 +263,11 @@ function pickNumber(data: Record<string, unknown>, keys: string[]) {
 }
 
 export async function getSmplyWalletBalance(): Promise<SmplyWalletBalance> {
-  const raw = await smplyRequest<Record<string, unknown>>(getApiPath("wallet"));
+  const projectCode = getProjectCode();
+  const walletPath = getApiPath("wallet");
+  const separator = walletPath.includes("?") ? "&" : "?";
+  const pathWithProject = `${walletPath}${separator}projectCode=${encodeURIComponent(projectCode)}`;
+  const raw = await smplyRequest<Record<string, unknown>>(pathWithProject);
   const balance =
     pickNumber(raw, ["balance", "available_balance", "wallet_balance", "amount"]) ?? 0;
   const currency = pickString(raw, ["currency", "currency_code"]) ?? "KES";
@@ -294,14 +325,11 @@ export async function initiateSmplyWithdrawal(input: {
 }) {
   const raw = await smplyRequest<Record<string, unknown>>(getApiPath("withdraw"), {
     method: "POST",
-    body: {
-      phone: normalizeKenyanPhone(input.phone),
-      msisdn: normalizeKenyanPhone(input.phone),
-      amount: Math.round(input.amount),
+    body: buildWithdrawBody({
+      phone: input.phone,
+      amount: input.amount,
       reference: input.reference,
-      description: input.description ?? "HarakaCash admin withdrawal",
-      callback_url: getCallbackUrl("/api/webhooks/smply-pay"),
-    },
+    }),
   });
 
   const providerRef = pickString(raw, [
@@ -309,12 +337,19 @@ export async function initiateSmplyWithdrawal(input: {
     "withdrawal_id",
     "ConversationID",
     "OriginatorConversationID",
+    "order_number",
+    "orderNumber",
     "id",
   ]);
-  const message = pickString(raw, ["message", "ResponseDescription"]);
+  const message = pickString(raw, ["message", "ResponseDescription", "CustomerMessage"]);
   const statusValue = pickString(raw, ["status", "state"]);
+  // B2C "success" usually means the payout was accepted — confirm via webhook when present.
   const status: SmplyWithdrawResult["status"] =
-    statusValue === "success" || statusValue === "completed" ? "success" : "pending";
+    statusValue === "failed" || statusValue === "cancelled"
+      ? "failed"
+      : statusValue === "success" || statusValue === "completed"
+        ? "success"
+        : "pending";
 
   return {
     reference: input.reference,
