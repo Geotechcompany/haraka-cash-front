@@ -31,6 +31,7 @@ async function createIndexes(db: Db) {
     db.collection("applications").createIndex({ applicationNumber: 1 }, { unique: true }),
     db.collection("applications").createIndex({ clerkUserId: 1, createdAt: -1 }),
     db.collection("applications").createIndex({ status: 1, updatedAt: -1 }),
+    db.collection("application_drafts").createIndex({ clerkId: 1 }, { unique: true }),
     db.collection("users").createIndex({ clerkId: 1 }, { unique: true }),
     db.collection("users").createIndex({ status: 1 }),
     db.collection("users").createIndex({ email: 1 }, { unique: true, sparse: true }),

@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, Upload, Sparkles, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,18 +17,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { isDraftWorthSaving } from "@/lib/application-draft";
 import { buildLoanQuote, kes } from "@/lib/loan";
 import { kenyanNationalIdError, kenyanPhoneError } from "@/lib/kenya-format";
 import { cn } from "@/lib/utils";
-import { createApplication, getCurrentUser } from "@/server/applications";
+import {
+  createApplication,
+  getApplicationDraft,
+  getCurrentUser,
+  saveApplicationDraft,
+} from "@/server/applications";
 import { generateLoanQuote, type GeneratedLoanQuote } from "@/server/quote";
 import { getPublicLendingPolicy } from "@/server/settings";
 
 export const Route = createFileRoute("/apply")({
   head: () => ({ meta: [{ title: "Apply for a loan — HarakaCash" }] }),
   loader: async () => {
-    const [user, lendingPolicy] = await Promise.all([getCurrentUser(), getPublicLendingPolicy()]);
-    return { user, lendingPolicy };
+    const [user, lendingPolicy, draft] = await Promise.all([
+      getCurrentUser(),
+      getPublicLendingPolicy(),
+      getApplicationDraft(),
+    ]);
+    return { user, lendingPolicy, draft };
   },
   component: ApplyPage,
 });
@@ -61,36 +72,50 @@ type FormState = {
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 function ApplyPage() {
-  const { user, lendingPolicy } = Route.useLoaderData();
+  const { user, lendingPolicy, draft } = Route.useLoaderData();
   const navigate = useNavigate();
   const createApplicationFn = useServerFn(createApplication);
+  const saveApplicationDraftFn = useServerFn(saveApplicationDraft);
   const generateLoanQuoteFn = useServerFn(generateLoanQuote);
-  const [step, setStep] = useState(0);
-  const [amount, setAmount] = useState(
-    Math.min(Math.max(10_000, lendingPolicy.minLoanAmount), lendingPolicy.maxLoanAmount),
+  const defaultAmount = Math.min(
+    Math.max(10_000, lendingPolicy.minLoanAmount),
+    lendingPolicy.maxLoanAmount,
   );
-  const [months, setMonths] = useState(3);
+  const [step, setStep] = useState(() => draft?.step ?? 0);
+  const [amount, setAmount] = useState(() => draft?.amount ?? defaultAmount);
+  const [months, setMonths] = useState(() => draft?.months ?? 3);
   const [submitting, setSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [quoteUpdating, setQuoteUpdating] = useState(false);
   const [serverQuote, setServerQuote] = useState<GeneratedLoanQuote | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [draftHydrated, setDraftHydrated] = useState(!draft);
+  const skipNextAutosaveRef = useRef(Boolean(draft));
+  const restoredToastShownRef = useRef(false);
 
-  const [form, setForm] = useState<FormState>({
-    fullName: user?.name ?? "",
-    nationalId: "",
-    phone: user?.phone ?? "",
-    mpesaNumber: user?.phone ?? "",
-    employmentStatus: "Employed",
-    employer: "",
-    jobTitle: "",
-    yearsAtEmployer: "",
-    monthlyIncome: "",
-    monthlyExpenses: "",
-    existingLoans: "",
-    rentMortgage: "",
-    purpose: "Business",
-    additionalDetails: "",
-    idDocumentName: "",
+  const [form, setForm] = useState<FormState>(() => ({
+    fullName: draft?.form.fullName || user?.name || "",
+    nationalId: draft?.form.nationalId ?? "",
+    phone: draft?.form.phone || user?.phone || "",
+    mpesaNumber: draft?.form.mpesaNumber || user?.phone || "",
+    employmentStatus: draft?.form.employmentStatus || "Employed",
+    employer: draft?.form.employer ?? "",
+    jobTitle: draft?.form.jobTitle ?? "",
+    yearsAtEmployer: draft?.form.yearsAtEmployer ?? "",
+    monthlyIncome: draft?.form.monthlyIncome ?? "",
+    monthlyExpenses: draft?.form.monthlyExpenses ?? "",
+    existingLoans: draft?.form.existingLoans ?? "",
+    rentMortgage: draft?.form.rentMortgage ?? "",
+    purpose: draft?.form.purpose || "Business",
+    additionalDetails: draft?.form.additionalDetails ?? "",
+    idDocumentName: draft?.form.idDocumentName ?? "",
+  }));
+
+  const latestDraftRef = useRef({
+    step: draft?.step ?? 0,
+    amount: draft?.amount ?? defaultAmount,
+    months: draft?.months ?? 3,
+    form,
   });
 
   const localQuote = useMemo(
@@ -120,6 +145,103 @@ function ApplyPage() {
   useEffect(() => {
     setAttempted(false);
   }, [step]);
+
+  useEffect(() => {
+    if (!draft) {
+      setDraftHydrated(true);
+      return;
+    }
+    if (!restoredToastShownRef.current) {
+      restoredToastShownRef.current = true;
+      toast.message("Draft restored");
+    }
+    skipNextAutosaveRef.current = true;
+    setDraftHydrated(true);
+  }, [draft]);
+
+  useEffect(() => {
+    latestDraftRef.current = { step, amount, months, form };
+  }, [step, amount, months, form]);
+
+  useEffect(() => {
+    if (!user || !draftHydrated) return;
+
+    const worthSaving = isDraftWorthSaving({
+      step,
+      amount,
+      months,
+      form,
+      defaultAmount,
+    });
+    if (!worthSaving) return;
+
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSaveStatus("saving");
+      void saveApplicationDraftFn({ data: { step, amount, months, form } })
+        .then(() => {
+          setSaveStatus("saved");
+        })
+        .catch(() => {
+          setSaveStatus("error");
+        });
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    user,
+    draftHydrated,
+    step,
+    amount,
+    months,
+    form,
+    defaultAmount,
+    saveApplicationDraftFn,
+  ]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const flushDraft = () => {
+      const snapshot = latestDraftRef.current;
+      if (
+        !isDraftWorthSaving({
+          step: snapshot.step,
+          amount: snapshot.amount,
+          months: snapshot.months,
+          form: snapshot.form,
+          defaultAmount,
+        })
+      ) {
+        return;
+      }
+      void saveApplicationDraftFn({
+        data: {
+          step: snapshot.step,
+          amount: snapshot.amount,
+          months: snapshot.months,
+          form: snapshot.form,
+        },
+      }).catch(() => {
+        /* best-effort flush on leave */
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushDraft();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flushDraft);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flushDraft);
+    };
+  }, [user, defaultAmount, saveApplicationDraftFn]);
 
   useEffect(() => {
     const income = Number(form.monthlyIncome);
@@ -227,14 +349,39 @@ function ApplyPage() {
     return undefined;
   };
 
+  const saveLabel =
+    saveStatus === "saving"
+      ? "Saving…"
+      : saveStatus === "saved"
+        ? "Saved"
+        : saveStatus === "error"
+          ? "Save failed"
+          : null;
+
   return (
     <AppShell>
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Apply for a loan</h1>
-          <p className="mt-2 text-muted-foreground">
-            Answer a few quick questions to get a decision.
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Apply for a loan</h1>
+              <p className="mt-2 text-muted-foreground">
+                Answer a few quick questions to get a decision.
+              </p>
+            </div>
+            {user && saveLabel ? (
+              <p
+                className={cn(
+                  "mt-1 shrink-0 text-xs font-medium",
+                  saveStatus === "error" ? "text-destructive" : "text-muted-foreground",
+                  saveStatus === "saving" && "animate-pulse",
+                )}
+                aria-live="polite"
+              >
+                {saveLabel}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <ol className="hidden md:flex items-center gap-2 mb-8">

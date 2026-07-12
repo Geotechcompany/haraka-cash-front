@@ -112,6 +112,8 @@ test("platform settings mapper supplies defaults for legacy records", () => {
   assert.equal(settings.geminiApiKeyMasked, "");
   assert.equal(settings.openaiApiKeyConfigured, false);
   assert.equal(settings.openaiApiKeyMasked, "");
+  assert.equal(settings.nvidiaApiKeyConfigured, false);
+  assert.equal(settings.nvidiaApiKeyMasked, "");
 });
 
 test("platform settings masks Gemini API key and never exposes raw value", () => {
@@ -134,6 +136,18 @@ test("platform settings masks OpenAI API key and never exposes raw value", () =>
   assert.equal(settings.openaiApiKeyMasked, "••••••••9999");
   assert.equal(settings.quoteAiProvider, "openai");
   assert.equal("openaiApiKey" in settings, false);
+});
+
+test("platform settings masks NVIDIA API key and never exposes raw value", () => {
+  const settings = toPlatformSettings({
+    key: "platform-lending",
+    nvidiaApiKey: "nvapi-SecretNvidiaKeyValueABCD",
+    quoteAiProvider: "nvidia",
+  });
+  assert.equal(settings.nvidiaApiKeyConfigured, true);
+  assert.equal(settings.nvidiaApiKeyMasked, "••••••••ABCD");
+  assert.equal(settings.quoteAiProvider, "nvidia");
+  assert.equal("nvidiaApiKey" in settings, false);
 });
 
 test("CSV report response sets download headers and serializes rows", async () => {

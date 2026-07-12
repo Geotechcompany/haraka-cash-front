@@ -8,6 +8,11 @@ import {
   type ApplicationRecord,
   type ApplicationStatus,
 } from "@/lib/models/application";
+import {
+  toApplicationDraft,
+  type ApplicationDraftRecord,
+} from "@/lib/models/application-draft";
+import { normalizeDraftPayload } from "@/lib/application-draft";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
 import { buildLoanQuote } from "@/lib/loan";
 import { isValidKenyanPhone } from "@/lib/kenya-format";
@@ -53,6 +58,103 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
   if (!isAuthenticated || !userId) return null;
   const user = await ensureUser(userId);
   return toUserProfile(user);
+});
+
+const draftFormSchema = z.object({
+  fullName: z.string().max(120).default(""),
+  nationalId: z.string().max(20).default(""),
+  phone: z.string().max(20).default(""),
+  mpesaNumber: z.string().max(20).default(""),
+  employmentStatus: z.string().max(80).default("Employed"),
+  employer: z.string().max(120).default(""),
+  jobTitle: z.string().max(80).default(""),
+  yearsAtEmployer: z.string().max(10).default(""),
+  monthlyIncome: z.string().max(20).default(""),
+  monthlyExpenses: z.string().max(20).default(""),
+  existingLoans: z.string().max(20).default(""),
+  rentMortgage: z.string().max(20).default(""),
+  purpose: z.string().max(80).default("Business"),
+  additionalDetails: z.string().max(2000).default(""),
+  idDocumentName: z.string().max(260).default(""),
+});
+
+const saveApplicationDraftInput = z.object({
+  step: z.number().int().min(0).max(10),
+  amount: z.number().positive(),
+  months: z.number().int().min(1).max(12),
+  form: draftFormSchema,
+});
+
+export const getApplicationDraft = createServerFn({ method: "GET" }).handler(async () => {
+  const { userId, isAuthenticated } = await auth();
+  if (!isAuthenticated || !userId) return null;
+
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  const doc = await db.collection<ApplicationDraftRecord>("application_drafts").findOne({
+    clerkId: userId,
+  });
+  if (!doc) return null;
+
+  const { readPlatformSettings } = await import("@/server/settings");
+  const lendingSettings = await readPlatformSettings();
+  const payload = normalizeDraftPayload(
+    {
+      step: doc.step,
+      amount: doc.amount,
+      months: doc.months,
+      form: doc.form,
+    },
+    {
+      maxStep: 4,
+      minAmount: lendingSettings.minLoanAmount,
+      maxAmount: lendingSettings.maxLoanAmount,
+    },
+  );
+
+  return toApplicationDraft({
+    ...doc,
+    ...payload,
+  });
+});
+
+export const saveApplicationDraft = createServerFn({ method: "POST" })
+  .validator((data: unknown) => saveApplicationDraftInput.parse(data))
+  .handler(async ({ data }) => {
+    const clerkId = await requireUserId();
+    const { readPlatformSettings } = await import("@/server/settings");
+    const lendingSettings = await readPlatformSettings();
+    const payload = normalizeDraftPayload(data, {
+      maxStep: 4,
+      minAmount: lendingSettings.minLoanAmount,
+      maxAmount: lendingSettings.maxLoanAmount,
+    });
+
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const now = new Date();
+    await db.collection<ApplicationDraftRecord>("application_drafts").updateOne(
+      { clerkId },
+      {
+        $set: {
+          ...payload,
+          clerkId,
+          updatedAt: now,
+        },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    );
+
+    return { ok: true as const, updatedAt: now.toISOString() };
+  });
+
+export const clearApplicationDraft = createServerFn({ method: "POST" }).handler(async () => {
+  const clerkId = await requireUserId();
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  await db.collection("application_drafts").deleteOne({ clerkId });
+  return { ok: true as const };
 });
 
 const listApplicationsInput = z
@@ -207,6 +309,7 @@ export const createApplication = createServerFn({ method: "POST" })
     };
 
     await db.collection<ApplicationRecord>("applications").insertOne(doc);
+    await db.collection("application_drafts").deleteOne({ clerkId: clerkUserId });
     const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: applicant,

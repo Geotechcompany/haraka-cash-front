@@ -22,7 +22,7 @@ export type GeneratedLoanQuote = {
   monthly: number;
   notes?: string;
   riskBand?: "low" | "moderate" | "elevated" | "high";
-  source: "gemini" | "openai" | "local";
+  source: "gemini" | "openai" | "nvidia" | "local";
 };
 
 function moneyMatchesBaseline(
@@ -48,7 +48,7 @@ function moneyMatchesBaseline(
 
 /**
  * Builds a loan quote. Money math always comes from buildLoanQuote / processingFee
- * (with admin minProcessingFee floor). Gemini or OpenAI may add notes + riskBand.
+ * (with admin minProcessingFee floor). Gemini, OpenAI, or NVIDIA may add notes + riskBand.
  * Falls back to local calc if no provider key works or the response is invalid.
  */
 export const generateLoanQuote = createServerFn({ method: "POST" })

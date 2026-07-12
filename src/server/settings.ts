@@ -16,7 +16,7 @@ function isMaskedSecretInput(value: string) {
 }
 
 /**
- * Secret key update semantics (gemini / openai):
+ * Secret key update semantics (gemini / openai / nvidia):
  * - omit / undefined → keep existing
  * - string of only • (masked) or starts with •••• → keep existing
  * - "" → clear stored key (fall back to env)
@@ -24,7 +24,7 @@ function isMaskedSecretInput(value: string) {
  */
 function applySecretKeyUpdate(
   input: string | undefined,
-  field: "geminiApiKey" | "openaiApiKey",
+  field: "geminiApiKey" | "openaiApiKey" | "nvidiaApiKey",
   $set: Partial<PlatformSettingsRecord>,
 ) {
   if (input === undefined) return;
@@ -50,6 +50,7 @@ const platformSettingsInput = z
     quoteAiProvider: z.enum(QUOTE_AI_PROVIDERS),
     geminiApiKey: z.string().optional(),
     openaiApiKey: z.string().optional(),
+    nvidiaApiKey: z.string().optional(),
   })
   .refine((settings) => settings.maxLoanAmount >= settings.minLoanAmount, {
     message: "Maximum loan amount must be greater than or equal to the minimum",
@@ -96,6 +97,18 @@ export async function resolveOpenAiApiKey() {
   return process.env.OPENAI_API_KEY?.trim() || "";
 }
 
+/**
+ * Resolution order for NVIDIA NIM:
+ * 1. Admin-saved platform setting `nvidiaApiKey`
+ * 2. `NVIDIA_API_KEY` env
+ */
+export async function resolveNvidiaApiKey() {
+  const record = await readPlatformSettingsRecord();
+  const fromAdmin = record?.nvidiaApiKey?.trim();
+  if (fromAdmin) return fromAdmin;
+  return process.env.NVIDIA_API_KEY?.trim() || "";
+}
+
 export const getAdminPlatformSettings = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
   return readPlatformSettings();
@@ -123,6 +136,7 @@ export const updateAdminPlatformSettings = createServerFn({ method: "POST" })
     const {
       geminiApiKey: geminiApiKeyInput,
       openaiApiKey: openaiApiKeyInput,
+      nvidiaApiKey: nvidiaApiKeyInput,
       ...policyFields
     } = data;
 
@@ -137,6 +151,7 @@ export const updateAdminPlatformSettings = createServerFn({ method: "POST" })
 
     applySecretKeyUpdate(geminiApiKeyInput, "geminiApiKey", $set);
     applySecretKeyUpdate(openaiApiKeyInput, "openaiApiKey", $set);
+    applySecretKeyUpdate(nvidiaApiKeyInput, "nvidiaApiKey", $set);
 
     await db.collection<PlatformSettingsRecord>("settings").updateOne(
       { key: PLATFORM_SETTINGS_KEY },

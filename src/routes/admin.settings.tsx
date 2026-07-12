@@ -33,6 +33,9 @@ function AdminSettingsPage() {
   const [openaiApiKeyInput, setOpenaiApiKeyInput] = useState(
     initialSettings.openaiApiKeyMasked || "",
   );
+  const [nvidiaApiKeyInput, setNvidiaApiKeyInput] = useState(
+    initialSettings.nvidiaApiKeyMasked || "",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const setNumber = (
@@ -59,6 +62,7 @@ function AdminSettingsPage() {
     try {
       const geminiChanged = geminiApiKeyInput !== (settings.geminiApiKeyMasked || "");
       const openaiChanged = openaiApiKeyInput !== (settings.openaiApiKeyMasked || "");
+      const nvidiaChanged = nvidiaApiKeyInput !== (settings.nvidiaApiKeyMasked || "");
       const updated = await updateSettings({
         data: {
           minLoanAmount: settings.minLoanAmount,
@@ -73,11 +77,13 @@ function AdminSettingsPage() {
           quoteAiProvider: settings.quoteAiProvider,
           ...(geminiChanged ? { geminiApiKey: geminiApiKeyInput } : {}),
           ...(openaiChanged ? { openaiApiKey: openaiApiKeyInput } : {}),
+          ...(nvidiaChanged ? { nvidiaApiKey: nvidiaApiKeyInput } : {}),
         },
       });
       setSettings(updated);
       setGeminiApiKeyInput(updated.geminiApiKeyMasked || "");
       setOpenaiApiKeyInput(updated.openaiApiKeyMasked || "");
+      setNvidiaApiKeyInput(updated.nvidiaApiKeyMasked || "");
       toast.success("Platform settings saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save settings");
@@ -161,15 +167,16 @@ function AdminSettingsPage() {
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto (Gemini, then OpenAI)</SelectItem>
+                  <SelectItem value="auto">Auto (Gemini → OpenAI → NVIDIA)</SelectItem>
                   <SelectItem value="gemini">Gemini</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="nvidia">NVIDIA</SelectItem>
                   <SelectItem value="off">Off</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Money math stays local. AI only adds notes and risk band. Missing keys fall back to
-                the other provider, then local-only.
+                Money math stays local. AI only adds notes and risk band. Auto tries Gemini, then
+                OpenAI, then NVIDIA. Missing keys skip to the next provider, then local-only.
               </p>
             </div>
 
@@ -216,6 +223,29 @@ function AdminSettingsPage() {
                 {settings.openaiApiKeyConfigured
                   ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
                   : "No admin key saved. Uses OPENAI_API_KEY if set."}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="nvidia-api-key">NVIDIA API key</Label>
+              <Input
+                id="nvidia-api-key"
+                type="password"
+                autoComplete="off"
+                className="h-11 rounded-xl font-mono text-sm"
+                value={nvidiaApiKeyInput}
+                placeholder="Paste key, or leave blank to use env"
+                onChange={(event) => setNvidiaApiKeyInput(event.target.value)}
+                onFocus={() => {
+                  if (nvidiaApiKeyInput.startsWith("••••")) {
+                    setNvidiaApiKeyInput("");
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {settings.nvidiaApiKeyConfigured
+                  ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
+                  : "No admin key saved. Uses NVIDIA_API_KEY if set (NIM OpenAI-compatible)."}
               </p>
             </div>
           </div>

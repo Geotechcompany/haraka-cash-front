@@ -4,10 +4,11 @@
  * Key resolution (see settings.ts):
  * - Gemini: admin DB → GEMINI_API_KEY → GOOGLE_GENERATIVE_AI_API_KEY
  * - OpenAI: admin DB → OPENAI_API_KEY
+ * - NVIDIA: admin DB → NVIDIA_API_KEY (NIM OpenAI-compatible)
  *
  * Provider selection (`quoteAiProvider`):
- * - auto (default): Gemini if key, else OpenAI if key, else none
- * - gemini / openai: try that provider first; if its key is missing, try the other
+ * - auto (default): Gemini → OpenAI → NVIDIA (first key that works)
+ * - gemini / openai / nvidia: try that provider first; then the other two
  * - off: skip AI (deterministic money math only)
  *
  * Never import this module from client routes — use createServerFn wrappers only.
@@ -22,6 +23,7 @@ import {
   aiProviderOrder,
   extractJsonObject,
   generateJsonWithGemini,
+  generateJsonWithNvidia,
   generateJsonWithOpenAi,
   type AiProviderSource,
 } from "@/server/ai-provider.server";
@@ -127,6 +129,33 @@ export async function requestOpenAiLoanQuote(
   return quoteAiNotesSchema.parse(extractJsonObject(text));
 }
 
+export async function requestNvidiaLoanQuote(
+  input: QuoteAiInput,
+): Promise<QuoteAiNotesPayload | null> {
+  const text = await generateJsonWithNvidia({
+    system:
+      "You return only valid JSON for HarakaCash loan quote notes. Never invent money figures that differ from the baseline.",
+    prompt: buildQuotePrompt(input),
+    temperature: 0.2,
+  });
+  if (!text) return null;
+  return quoteAiNotesSchema.parse(extractJsonObject(text));
+}
+
+async function requestQuoteForSource(
+  source: AiProviderSource,
+  input: QuoteAiInput,
+): Promise<QuoteAiNotesPayload | null> {
+  switch (source) {
+    case "gemini":
+      return requestGeminiLoanQuote(input);
+    case "openai":
+      return requestOpenAiLoanQuote(input);
+    case "nvidia":
+      return requestNvidiaLoanQuote(input);
+  }
+}
+
 /** @deprecated Prefer aiProviderOrder from ai-provider.server */
 export function quoteAiProviderOrder(provider: QuoteAiProvider): QuoteAiSource[] {
   return aiProviderOrder(provider);
@@ -138,10 +167,7 @@ export async function requestLoanQuoteAiNotes(
 ): Promise<QuoteAiResult | null> {
   for (const source of aiProviderOrder(provider)) {
     try {
-      const payload =
-        source === "gemini"
-          ? await requestGeminiLoanQuote(input)
-          : await requestOpenAiLoanQuote(input);
+      const payload = await requestQuoteForSource(source, input);
       if (payload) return { payload, source };
     } catch {
       // try next provider

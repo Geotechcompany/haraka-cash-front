@@ -7,7 +7,7 @@ import {
   normalizeAssessmentSteps,
 } from "@/lib/assessment-policy";
 import { ASSESSMENT_STEP_IDS, ASSESSMENT_STEPS } from "@/lib/assessment-steps";
-import { aiAssessmentSchema } from "@/server/assessment-ai.server";
+import { aiAssessmentSchema, normalizeAiAssessmentPayload } from "@/server/assessment-ai.server";
 import { aiProviderOrder } from "@/server/ai-provider.server";
 
 describe("assessment step catalog", () => {
@@ -20,9 +20,10 @@ describe("assessment step catalog", () => {
 
 describe("aiProviderOrder", () => {
   it("matches quote provider resolution", () => {
-    assert.deepEqual(aiProviderOrder("auto"), ["gemini", "openai"]);
-    assert.deepEqual(aiProviderOrder("openai"), ["openai", "gemini"]);
-    assert.deepEqual(aiProviderOrder("gemini"), ["gemini", "openai"]);
+    assert.deepEqual(aiProviderOrder("auto"), ["gemini", "openai", "nvidia"]);
+    assert.deepEqual(aiProviderOrder("openai"), ["openai", "gemini", "nvidia"]);
+    assert.deepEqual(aiProviderOrder("gemini"), ["gemini", "openai", "nvidia"]);
+    assert.deepEqual(aiProviderOrder("nvidia"), ["nvidia", "gemini", "openai"]);
     assert.deepEqual(aiProviderOrder("off"), []);
   });
 });
@@ -144,5 +145,16 @@ describe("aiAssessmentSchema", () => {
         decisionHint: "maybe",
       }),
     );
+  });
+
+  it("normalizes review alias to manual_review", () => {
+    const normalized = normalizeAiAssessmentPayload({
+      steps: [{ id: "identity", status: "passed" }],
+      overallScore: 50,
+      eligible: true,
+      decisionHint: "review",
+    });
+    const payload = aiAssessmentSchema.parse(normalized);
+    assert.equal(payload.decisionHint, "manual_review");
   });
 });

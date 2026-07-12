@@ -1,6 +1,6 @@
 export const PLATFORM_SETTINGS_KEY = "platform-lending" as const;
 
-export const QUOTE_AI_PROVIDERS = ["auto", "gemini", "openai", "off"] as const;
+export const QUOTE_AI_PROVIDERS = ["auto", "gemini", "openai", "nvidia", "off"] as const;
 export type QuoteAiProvider = (typeof QUOTE_AI_PROVIDERS)[number];
 
 export type PlatformSettingsRecord = {
@@ -19,6 +19,8 @@ export type PlatformSettingsRecord = {
   geminiApiKey?: string;
   /** Server-only. Never include in public/client DTOs. */
   openaiApiKey?: string;
+  /** Server-only. Never include in public/client DTOs. */
+  nvidiaApiKey?: string;
   /** Which AI provider enriches loan quote notes. Default: auto. */
   quoteAiProvider?: QuoteAiProvider;
   updatedBy?: string;
@@ -43,6 +45,8 @@ export type PlatformSettings = {
   geminiApiKeyMasked: string;
   openaiApiKeyConfigured: boolean;
   openaiApiKeyMasked: string;
+  nvidiaApiKeyConfigured: boolean;
+  nvidiaApiKeyMasked: string;
   updatedBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -64,6 +68,8 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   geminiApiKeyMasked: "",
   openaiApiKeyConfigured: false,
   openaiApiKeyMasked: "",
+  nvidiaApiKeyConfigured: false,
+  nvidiaApiKeyMasked: "",
 };
 
 function optionalIsoString(value?: Date): string | undefined {
@@ -90,6 +96,7 @@ export function toPlatformSettings(doc?: PlatformSettingsRecord | null): Platfor
 
   const geminiApiKey = doc.geminiApiKey?.trim() ?? "";
   const openaiApiKey = doc.openaiApiKey?.trim() ?? "";
+  const nvidiaApiKey = doc.nvidiaApiKey?.trim() ?? "";
 
   return {
     key: PLATFORM_SETTINGS_KEY,
@@ -107,6 +114,8 @@ export function toPlatformSettings(doc?: PlatformSettingsRecord | null): Platfor
     geminiApiKeyMasked: maskSecret(geminiApiKey),
     openaiApiKeyConfigured: Boolean(openaiApiKey),
     openaiApiKeyMasked: maskSecret(openaiApiKey),
+    nvidiaApiKeyConfigured: Boolean(nvidiaApiKey),
+    nvidiaApiKeyMasked: maskSecret(nvidiaApiKey),
     updatedBy: doc.updatedBy,
     createdAt: optionalIsoString(doc.createdAt),
     updatedAt: optionalIsoString(doc.updatedAt),

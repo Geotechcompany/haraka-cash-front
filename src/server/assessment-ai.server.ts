@@ -1,6 +1,6 @@
 /**
  * Server-only AI assessment of loan applications.
- * Uses the same admin Gemini/OpenAI key resolution and provider order as quote notes.
+ * Uses the same admin Gemini/OpenAI/NVIDIA key resolution and provider order as quote notes.
  *
  * Never import this module from client routes — use createServerFn wrappers only.
  */
@@ -24,6 +24,7 @@ import {
   aiProviderOrder,
   extractJsonObject,
   generateJsonWithGemini,
+  generateJsonWithNvidia,
   generateJsonWithOpenAi,
   type AiProviderSource,
 } from "@/server/ai-provider.server";
@@ -48,6 +49,33 @@ export const aiAssessmentSchema = z.object({
 });
 
 export type AiAssessmentPayload = z.infer<typeof aiAssessmentSchema>;
+
+/** Coerce common model aliases before strict zod parse. */
+export function normalizeAiAssessmentPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const copy = { ...(raw as Record<string, unknown>) };
+  const hint = copy.decisionHint;
+  if (typeof hint === "string") {
+    const normalized = hint.trim().toLowerCase().replace(/[\s-]+/g, "_");
+    if (normalized === "review" || normalized === "manual" || normalized === "manualreview") {
+      copy.decisionHint = "manual_review";
+    } else if (normalized === "approved" || normalized === "accept") {
+      copy.decisionHint = "approve";
+    } else if (normalized === "declined" || normalized === "reject" || normalized === "rejected") {
+      copy.decisionHint = "decline";
+    } else {
+      copy.decisionHint = normalized;
+    }
+  }
+  if (typeof copy.notes === "string" && copy.notes.length > 280) {
+    copy.notes = copy.notes.slice(0, 280);
+  }
+  return copy;
+}
+
+function parseAiAssessmentPayload(text: string): AiAssessmentPayload {
+  return aiAssessmentSchema.parse(normalizeAiAssessmentPayload(extractJsonObject(text)));
+}
 
 export type AssessmentAiResult = {
   clamped: ClampedAssessmentDecision;
@@ -136,8 +164,9 @@ Rules:
 1. Be conservative. Prefer "review" or "decline" when data is thin or income looks tight.
 2. If amount is outside min/max loan band, decisionHint must be "decline" and eligible false.
 3. If automatedApprovals is false, decisionHint must be "manual_review" or "decline", never "approve".
-4. notes: plain sentence, no marketing, never say "simulation".
-5. JSON only.`;
+4. decisionHint must be exactly "approve", "decline", or "manual_review" — never "review".
+5. notes: plain sentence, no marketing, never say "simulation".
+6. JSON only.`;
 }
 
 function toRawAssessment(payload: AiAssessmentPayload): RawAiAssessment {
@@ -158,7 +187,7 @@ async function requestGeminiAssessment(
     temperature: 0.15,
   });
   if (!text) return null;
-  return aiAssessmentSchema.parse(extractJsonObject(text));
+  return parseAiAssessmentPayload(text);
 }
 
 async function requestOpenAiAssessment(
@@ -171,7 +200,36 @@ async function requestOpenAiAssessment(
     temperature: 0.15,
   });
   if (!text) return null;
-  return aiAssessmentSchema.parse(extractJsonObject(text));
+  return parseAiAssessmentPayload(text);
+}
+
+async function requestNvidiaAssessment(
+  input: AssessmentAiInput,
+): Promise<AiAssessmentPayload | null> {
+  const text = await generateJsonWithNvidia({
+    system:
+      'You return only valid JSON for HarakaCash loan assessment. Be conservative. Never invent CRB data. decisionHint must be exactly one of: "approve", "decline", "manual_review" (never "review").',
+    prompt: buildAssessmentPrompt(input),
+    temperature: 0.15,
+    timeoutMs: 25_000,
+    maxTokens: 2048,
+  });
+  if (!text) return null;
+  return parseAiAssessmentPayload(text);
+}
+
+async function requestAssessmentForSource(
+  source: AiProviderSource,
+  input: AssessmentAiInput,
+): Promise<AiAssessmentPayload | null> {
+  switch (source) {
+    case "gemini":
+      return requestGeminiAssessment(input);
+    case "openai":
+      return requestOpenAiAssessment(input);
+    case "nvidia":
+      return requestNvidiaAssessment(input);
+  }
 }
 
 export async function requestAiAssessment(
@@ -180,10 +238,7 @@ export async function requestAiAssessment(
 ): Promise<{ raw: RawAiAssessment; source: AiProviderSource } | null> {
   for (const source of aiProviderOrder(provider)) {
     try {
-      const payload =
-        source === "gemini"
-          ? await requestGeminiAssessment(input)
-          : await requestOpenAiAssessment(input);
+      const payload = await requestAssessmentForSource(source, input);
       if (!payload) continue;
       const ids = new Set(payload.steps.map((step) => step.id));
       const missing = ASSESSMENT_STEP_IDS.filter((id) => !ids.has(id));

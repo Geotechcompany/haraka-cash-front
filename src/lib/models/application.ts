@@ -43,7 +43,7 @@ export type ApplicationRecord = {
   reviewNotes?: string;
   /** Internal assessment notes from AI / policy engine — not shown on public Application DTO. */
   assessmentNotes?: string;
-  assessmentSource?: "gemini" | "openai" | "local";
+  assessmentSource?: "gemini" | "openai" | "nvidia" | "local";
   quote?: {
     amount: number;
     months: number;
