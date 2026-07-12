@@ -25,7 +25,12 @@ export type ApplicationRecord = {
   mpesaNumber?: string;
   county: string;
   employer: string;
+  employmentStatus?: string;
+  jobTitle?: string;
+  yearsAtEmployer?: number;
   monthlyIncome: number;
+  monthlyExpenses?: number;
+  existingLoans?: number;
   amount: number;
   months: number;
   purpose: string;
@@ -36,6 +41,9 @@ export type ApplicationRecord = {
   reviewedBy?: string;
   reviewedAt?: Date;
   reviewNotes?: string;
+  /** Internal assessment notes from AI / policy engine — not shown on public Application DTO. */
+  assessmentNotes?: string;
+  assessmentSource?: "gemini" | "openai" | "local";
   quote?: {
     amount: number;
     months: number;

@@ -18,6 +18,13 @@ import { z } from "zod";
 
 import type { QuoteAiProvider } from "@/lib/models/settings";
 import type { LoanQuoteBreakdown } from "@/lib/loan";
+import {
+  aiProviderOrder,
+  extractJsonObject,
+  generateJsonWithGemini,
+  generateJsonWithOpenAi,
+  type AiProviderSource,
+} from "@/server/ai-provider.server";
 
 export const quoteAiNotesSchema = z.object({
   principal: z.number().positive(),
@@ -36,7 +43,7 @@ export const geminiQuoteSchema = quoteAiNotesSchema;
 export type QuoteAiNotesPayload = z.infer<typeof quoteAiNotesSchema>;
 export type GeminiQuotePayload = QuoteAiNotesPayload;
 
-export type QuoteAiSource = "gemini" | "openai";
+export type QuoteAiSource = AiProviderSource;
 
 export type QuoteAiResult = {
   payload: QuoteAiNotesPayload;
@@ -96,95 +103,40 @@ Rules:
 4. JSON only.`;
 }
 
-function extractJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced?.[1]?.trim() ?? trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("AI response did not contain JSON");
-  }
-  return JSON.parse(candidate.slice(start, end + 1));
-}
-
 export async function requestGeminiLoanQuote(
   input: QuoteAiInput,
 ): Promise<QuoteAiNotesPayload | null> {
-  const { resolveGeminiApiKey } = await import("@/server/settings");
-  const apiKey = await resolveGeminiApiKey();
-  if (!apiKey) return null;
-
-  const { GoogleGenerativeAI } = await import("@google/generative-ai");
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: "application/json",
-    },
+  const text = await generateJsonWithGemini({
+    prompt: buildQuotePrompt(input),
+    temperature: 0.2,
   });
-
-  const result = await model.generateContent(buildQuotePrompt(input));
-  const text = result.response.text();
-  const parsed = extractJsonObject(text);
-  return quoteAiNotesSchema.parse(parsed);
+  if (!text) return null;
+  return quoteAiNotesSchema.parse(extractJsonObject(text));
 }
 
 export async function requestOpenAiLoanQuote(
   input: QuoteAiInput,
 ): Promise<QuoteAiNotesPayload | null> {
-  const { resolveOpenAiApiKey } = await import("@/server/settings");
-  const apiKey = await resolveOpenAiApiKey();
-  if (!apiKey) return null;
-
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ apiKey });
-
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+  const text = await generateJsonWithOpenAi({
+    system:
+      "You return only valid JSON for HarakaCash loan quote notes. Never invent money figures that differ from the baseline.",
+    prompt: buildQuotePrompt(input),
     temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          "You return only valid JSON for HarakaCash loan quote notes. Never invent money figures that differ from the baseline.",
-      },
-      { role: "user", content: buildQuotePrompt(input) },
-    ],
   });
-
-  const text = completion.choices[0]?.message?.content;
   if (!text) return null;
-
-  const parsed = extractJsonObject(text);
-  return quoteAiNotesSchema.parse(parsed);
+  return quoteAiNotesSchema.parse(extractJsonObject(text));
 }
 
-/**
- * Provider attempt order from admin `quoteAiProvider`.
- * Prefer Gemini in auto mode; always fall back to the other provider when a key exists.
- */
+/** @deprecated Prefer aiProviderOrder from ai-provider.server */
 export function quoteAiProviderOrder(provider: QuoteAiProvider): QuoteAiSource[] {
-  switch (provider) {
-    case "off":
-      return [];
-    case "openai":
-      return ["openai", "gemini"];
-    case "gemini":
-      return ["gemini", "openai"];
-    case "auto":
-    default:
-      return ["gemini", "openai"];
-  }
+  return aiProviderOrder(provider);
 }
 
 export async function requestLoanQuoteAiNotes(
   input: QuoteAiInput,
   provider: QuoteAiProvider = "auto",
 ): Promise<QuoteAiResult | null> {
-  for (const source of quoteAiProviderOrder(provider)) {
+  for (const source of aiProviderOrder(provider)) {
     try {
       const payload =
         source === "gemini"

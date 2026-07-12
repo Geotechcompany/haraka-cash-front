@@ -124,7 +124,12 @@ const createApplicationInput = z.object({
   mpesaNumber: kenyanMobile,
   county: z.string().optional(),
   employer: z.string().optional(),
+  employmentStatus: z.string().max(80).optional(),
+  jobTitle: z.string().max(80).optional(),
+  yearsAtEmployer: z.number().min(0).max(60).optional(),
   monthlyIncome: z.number().optional(),
+  monthlyExpenses: z.number().nonnegative().optional(),
+  existingLoans: z.number().nonnegative().optional(),
   quote: z.object({
     amount: z.number(),
     months: z.number(),
@@ -177,7 +182,12 @@ export const createApplication = createServerFn({ method: "POST" })
       mpesaNumber,
       county: data.county ?? user.county ?? "Nairobi",
       employer: data.employer ?? "Not specified",
+      employmentStatus: data.employmentStatus?.trim() || undefined,
+      jobTitle: data.jobTitle?.trim() || undefined,
+      yearsAtEmployer: data.yearsAtEmployer,
       monthlyIncome: data.monthlyIncome ?? 0,
+      monthlyExpenses: data.monthlyExpenses,
+      existingLoans: data.existingLoans,
       amount: data.amount,
       months: data.months,
       purpose: data.purpose,
@@ -230,12 +240,37 @@ export const runAssessment = createServerFn({ method: "POST" })
 
     const { readPlatformSettings } = await import("@/server/settings");
     const lendingSettings = await readPlatformSettings();
-    const approved =
-      lendingSettings.automatedApprovals && doc.amount <= lendingSettings.maxLoanAmount;
-    const status: ApplicationStatus = approved ? "Approved" : "Declined";
-    const eligibilityScore = approved
-      ? Math.min(95, doc.eligibilityScore + 8)
-      : Math.max(25, doc.eligibilityScore - 15);
+
+    const { runAiAssessmentWithPolicy } = await import("@/server/assessment-ai.server");
+    const { clamped, source } = await runAiAssessmentWithPolicy(
+      {
+        applicant: doc.applicant,
+        phone: doc.phone,
+        mpesaNumber: doc.mpesaNumber,
+        county: doc.county,
+        employer: doc.employer,
+        employmentStatus: doc.employmentStatus,
+        jobTitle: doc.jobTitle,
+        yearsAtEmployer: doc.yearsAtEmployer,
+        monthlyIncome: doc.monthlyIncome,
+        monthlyExpenses: doc.monthlyExpenses,
+        existingLoans: doc.existingLoans,
+        amount: doc.amount,
+        months: doc.months,
+        purpose: doc.purpose,
+        baselineEligibilityScore: doc.eligibilityScore,
+        minLoanAmount: lendingSettings.minLoanAmount,
+        maxLoanAmount: lendingSettings.maxLoanAmount,
+        minProcessingFee: lendingSettings.minProcessingFee,
+        monthlyInterestRate: lendingSettings.monthlyInterestRate,
+        automatedApprovals: lendingSettings.automatedApprovals,
+        quoteMonthly: doc.quote?.monthly,
+      },
+      lendingSettings.quoteAiProvider,
+    );
+
+    const { approved, status, eligibilityScore, steps, notes, decisionHint, eligible } =
+      clamped;
 
     await db.collection<ApplicationRecord>("applications").updateOne(
       { applicationNumber },
@@ -244,6 +279,8 @@ export const runAssessment = createServerFn({ method: "POST" })
           status,
           eligibilityScore,
           riskScore: 100 - eligibilityScore,
+          assessmentNotes: notes,
+          assessmentSource: source,
           updatedAt: new Date(),
         },
       },
@@ -252,7 +289,9 @@ export const runAssessment = createServerFn({ method: "POST" })
     const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: "credit-engine",
-      action: approved ? "Approved application" : "Declined application",
+      action: approved
+        ? `Approved application (${source})`
+        : `Declined application (${source})`,
       target: applicationNumber,
     });
     await db.collection("notifications").insertOne({
@@ -266,7 +305,18 @@ export const runAssessment = createServerFn({ method: "POST" })
       createdAt: new Date(),
     });
 
-    return { applicationNumber, status, approved, eligibilityScore };
+    return {
+      applicationNumber,
+      status,
+      approved,
+      eligibilityScore,
+      source,
+      steps,
+      overallScore: eligibilityScore,
+      eligible,
+      decisionHint,
+      notes,
+    };
   });
 
 const updateStatusInput = z.object({

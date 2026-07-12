@@ -62,7 +62,7 @@ function DecisionPage() {
         setPaymentStatus(result.status);
 
         if (result.status === "success") {
-          toast.success("Fee received. Your application is under review for CRB checks.");
+          toast.success("Fee received. Your application is under review.");
           await router.invalidate();
           setPendingReference(null);
           setPaying(false);
@@ -272,7 +272,7 @@ function DecisionPage() {
             {kes(quote.fee)}.
           </p>
           <div className="mt-6 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            Do not leave this step until payment is confirmed. CRB review starts only after the fee is received.
+            Do not leave this step until payment is confirmed.
           </div>
           <Button
             variant="outline"
@@ -307,7 +307,7 @@ function DecisionPage() {
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
           <p className="mt-3 text-muted-foreground">
-            Pay the processing fee via M-Pesa. After payment is confirmed, our team runs CRB checks before disbursement.
+            Pay the processing fee via M-Pesa to continue.
           </p>
         </div>
 
@@ -335,7 +335,7 @@ function DecisionPage() {
           </div>
           <p className="text-sm text-muted-foreground">
             We will send an STK push for {kes(quote.fee)} to the M-Pesa number from your application.
-            Enter M-Pesa PIN on your phone. We'll continue when the fee is received — then CRB review begins.
+            Enter M-Pesa PIN on your phone. We'll continue when the fee is received.
           </p>
           <div className="mt-4 rounded-xl bg-muted/60 px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">STK push will go to</p>

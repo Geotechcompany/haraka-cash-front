@@ -194,7 +194,12 @@ function ApplyPage() {
           phone: form.phone.trim(),
           mpesaNumber: form.mpesaNumber.trim(),
           employer: form.employer.trim(),
+          employmentStatus: form.employmentStatus.trim() || undefined,
+          jobTitle: form.jobTitle.trim() || undefined,
+          yearsAtEmployer: Number(form.yearsAtEmployer) || undefined,
           monthlyIncome: Number(form.monthlyIncome) || 0,
+          monthlyExpenses: Number(form.monthlyExpenses) || 0,
+          existingLoans: Number(form.existingLoans) || 0,
           quote: {
             amount: quote.amount,
             months: quote.months,
