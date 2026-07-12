@@ -1,15 +1,28 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className, to = "/" }: { className?: string; to?: string }) {
+export function Logo({
+  className,
+  to = "/",
+  height = 40,
+}: {
+  className?: string;
+  to?: string;
+  height?: number;
+}) {
   return (
-    <Link to={to} className={cn("flex items-center gap-2 group", className)} aria-label="HarakaCash home">
-      <span className="grid h-9 w-9 place-items-center rounded-xl gradient-brand text-white font-bold shadow-soft transition-transform group-hover:scale-105">
-        H
-      </span>
-      <span className="font-semibold text-[17px] tracking-tight">
-        Haraka<span className="text-gradient-brand">Cash</span>
-      </span>
+    <Link
+      to={to}
+      className={cn("inline-flex items-center group", className)}
+      aria-label="HarakaCash home"
+    >
+      <img
+        src="/logo.png"
+        alt="Haraka Cash"
+        height={height}
+        className="h-10 w-auto max-w-[180px] object-contain object-left transition-transform group-hover:scale-[1.02]"
+        style={{ height }}
+      />
     </Link>
   );
 }
