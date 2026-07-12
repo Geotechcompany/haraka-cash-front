@@ -372,8 +372,15 @@ export const runAssessment = createServerFn({ method: "POST" })
       lendingSettings.quoteAiProvider,
     );
 
-    const { approved, status, eligibilityScore, steps, notes, decisionHint, eligible } =
+    const { approved, status, eligibilityScore, steps, notes, decisionHint, eligible, approvedAmount, isPartialOffer } =
       clamped;
+
+    const offerQuote = approved
+      ? buildLoanQuote(approvedAmount, doc.months, {
+          monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
+          minProcessingFee: lendingSettings.minProcessingFee,
+        })
+      : doc.quote;
 
     await db.collection<ApplicationRecord>("applications").updateOne(
       { applicationNumber },
@@ -382,8 +389,21 @@ export const runAssessment = createServerFn({ method: "POST" })
           status,
           eligibilityScore,
           riskScore: 100 - eligibilityScore,
+          approvedAmount: approved ? approvedAmount : 0,
           assessmentNotes: notes,
           assessmentSource: source,
+          ...(offerQuote
+            ? {
+                quote: {
+                  amount: offerQuote.amount,
+                  months: offerQuote.months,
+                  fee: offerQuote.fee,
+                  interest: offerQuote.interest,
+                  totalPayable: offerQuote.totalPayable,
+                  monthly: offerQuote.monthly,
+                },
+              }
+            : {}),
           updatedAt: new Date(),
         },
       },
@@ -393,7 +413,9 @@ export const runAssessment = createServerFn({ method: "POST" })
     await logAuditEvent({
       actor: "credit-engine",
       action: approved
-        ? `Approved application (${source})`
+        ? isPartialOffer
+          ? `Approved partial offer ${approvedAmount} of ${doc.amount} (${source})`
+          : `Approved application (${source})`
         : `Declined application (${source})`,
       target: applicationNumber,
     });
@@ -401,7 +423,9 @@ export const runAssessment = createServerFn({ method: "POST" })
       clerkUserId,
       title: approved ? "Offer ready" : "Application update",
       body: approved
-        ? `Your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} loan has been pre-approved.`
+        ? isPartialOffer
+          ? `Based on your profile we can offer ${approvedAmount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} of your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} request.`
+          : `Your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} loan has been pre-approved.`
         : `Application ${applicationNumber} was not approved at this time.`,
       type: approved ? "success" : "warning",
       unread: true,
@@ -412,6 +436,9 @@ export const runAssessment = createServerFn({ method: "POST" })
       applicationNumber,
       status,
       approved,
+      approvedAmount: approved ? approvedAmount : 0,
+      requestedAmount: doc.amount,
+      isPartialOffer,
       eligibilityScore,
       source,
       steps,

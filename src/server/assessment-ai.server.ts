@@ -45,6 +45,8 @@ export const aiAssessmentSchema = z.object({
   overallScore: z.number().min(0).max(100),
   eligible: z.boolean(),
   decisionHint: z.enum(["approve", "decline", "manual_review"]),
+  /** Offered principal in KES; must be ≤ loanAmount and ≥ minLoanAmount when approving. */
+  approvedAmount: z.number().int().nonnegative().optional(),
   notes: z.string().max(280).optional(),
 });
 
@@ -69,6 +71,10 @@ export function normalizeAiAssessmentPayload(raw: unknown): unknown {
   }
   if (typeof copy.notes === "string" && copy.notes.length > 280) {
     copy.notes = copy.notes.slice(0, 280);
+  }
+  if (copy.approvedAmount != null) {
+    const n = Number(copy.approvedAmount);
+    if (Number.isFinite(n)) copy.approvedAmount = Math.round(n);
   }
   return copy;
 }
@@ -116,6 +122,7 @@ function buildAssessmentPrompt(input: AssessmentAiInput): string {
   "overallScore": number (0-100),
   "eligible": boolean,
   "decisionHint": "approve" | "decline" | "manual_review",
+  "approvedAmount": number (integer KES; required when decisionHint is "approve"),
   "notes": string (optional, one short sentence for internal use)
 }
 
@@ -165,8 +172,10 @@ Rules:
 2. If amount is outside min/max loan band, decisionHint must be "decline" and eligible false.
 3. If automatedApprovals is false, decisionHint must be "manual_review" or "decline", never "approve".
 4. decisionHint must be exactly "approve", "decline", or "manual_review" — never "review".
-5. notes: plain sentence, no marketing, never say "simulation".
-6. JSON only.`;
+5. When approving, set approvedAmount to an integer KES offer ≤ loanAmount and ≥ minLoanAmount. Prefer the full request when affordable; otherwise offer a lower amount the applicant can service (partial approval is allowed). Use 0 only when declining.
+6. When declining, set approvedAmount to 0 (or omit it).
+7. notes: plain sentence, no marketing, never say "simulation".
+8. JSON only.`;
 }
 
 function toRawAssessment(payload: AiAssessmentPayload): RawAiAssessment {
@@ -175,6 +184,7 @@ function toRawAssessment(payload: AiAssessmentPayload): RawAiAssessment {
     overallScore: payload.overallScore,
     eligible: payload.eligible,
     decisionHint: payload.decisionHint as AssessmentDecisionHint,
+    approvedAmount: payload.approvedAmount,
     notes: payload.notes,
   };
 }
@@ -263,6 +273,12 @@ export async function runAiAssessmentWithPolicy(
     maxLoanAmount: input.maxLoanAmount,
     automatedApprovals: input.automatedApprovals,
     baselineEligibilityScore: input.baselineEligibilityScore,
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    months: input.months,
+    monthlyInterestRatePercent: input.monthlyInterestRate,
+    minProcessingFee: input.minProcessingFee,
     ai: ai?.raw ?? null,
   });
 

@@ -114,17 +114,8 @@ function Landing() {
         </div>
       </header>
 
-      {/* One composition: brand + headline + line + CTAs + full-bleed product plane */}
-      <section className="relative min-h-[min(92dvh,920px)] overflow-hidden landing-hero-plane text-white">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E\")",
-          }}
-          aria-hidden
-        />
-
+      {/* One composition: brand + headline + line + CTAs + full-bleed photo plane */}
+      <section className="relative min-h-[min(92dvh,920px)] overflow-hidden landing-hero-photo text-white">
         <div className="relative mx-auto grid min-h-[min(92dvh,920px)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-0 lg:px-8 lg:py-24">
           <motion.div
             className="relative z-10 max-w-xl"

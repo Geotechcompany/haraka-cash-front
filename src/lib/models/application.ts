@@ -31,7 +31,10 @@ export type ApplicationRecord = {
   monthlyIncome: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  /** Requested principal (KES). */
   amount: number;
+  /** Offered / approved principal after assessment (KES). ≤ amount when set. */
+  approvedAmount?: number;
   months: number;
   purpose: string;
   eligibilityScore: number;
@@ -64,7 +67,10 @@ export type Application = {
   county: string;
   employer: string;
   monthlyIncome: number;
+  /** Requested principal (KES). */
   amount: number;
+  /** Offered principal after assessment (KES). Present when approved (may equal amount). */
+  approvedAmount?: number;
   months: number;
   purpose: string;
   eligibilityScore: number;
@@ -96,6 +102,7 @@ export function toApplication(doc: ApplicationRecord): Application {
     employer: doc.employer,
     monthlyIncome: doc.monthlyIncome,
     amount: doc.amount,
+    approvedAmount: doc.approvedAmount,
     months: doc.months,
     purpose: doc.purpose,
     eligibilityScore: doc.eligibilityScore,

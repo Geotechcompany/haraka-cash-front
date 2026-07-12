@@ -83,6 +83,9 @@ function ApplyPage() {
   );
   const [step, setStep] = useState(() => draft?.step ?? 0);
   const [amount, setAmount] = useState(() => draft?.amount ?? defaultAmount);
+  const [amountInput, setAmountInput] = useState(() =>
+    String(draft?.amount ?? defaultAmount),
+  );
   const [months, setMonths] = useState(() => draft?.months ?? 3);
   const [submitting, setSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -141,6 +144,38 @@ function ApplyPage() {
 
   const errors = useMemo(() => validateStep(step, form), [step, form]);
   const stepValid = Object.keys(errors).length === 0;
+
+  const clampAmountToPolicy = (raw: number) =>
+    Math.min(
+      Math.max(Math.round(raw), lendingPolicy.minLoanAmount),
+      lendingPolicy.maxLoanAmount,
+    );
+
+  const setAmountSynced = (next: number) => {
+    const clamped = clampAmountToPolicy(next);
+    setAmount(clamped);
+    setAmountInput(String(clamped));
+  };
+
+  const onAmountInputChange = (value: string) => {
+    const digits = value.replace(/[^\d]/g, "");
+    setAmountInput(digits);
+    if (digits === "") return;
+    const parsed = Number(digits);
+    if (!Number.isFinite(parsed)) return;
+    if (parsed >= lendingPolicy.minLoanAmount && parsed <= lendingPolicy.maxLoanAmount) {
+      setAmount(Math.round(parsed));
+    }
+  };
+
+  const onAmountInputBlur = () => {
+    if (amountInput.trim() === "") {
+      setAmountSynced(amount);
+      return;
+    }
+    const parsed = Number(amountInput);
+    setAmountSynced(Number.isFinite(parsed) ? parsed : amount);
+  };
 
   useEffect(() => {
     setAttempted(false);
@@ -606,20 +641,37 @@ function ApplyPage() {
 
                 {step === 3 && (
                   <div className="space-y-6">
-                    <div>
-                      <div className="flex justify-between">
-                        <Label>Loan amount</Label>
-                        <span className="text-lg font-bold tabular-nums">{kes(amount)}</span>
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <Label htmlFor="loanAmount">Loan amount (KES)</Label>
+                        <div className="relative w-full sm:w-44">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                            KES
+                          </span>
+                          <Input
+                            id="loanAmount"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            className="h-11 rounded-xl pl-12 text-right tabular-nums text-lg font-bold"
+                            value={amountInput}
+                            onChange={(e) => onAmountInputChange(e.target.value)}
+                            onBlur={onAmountInputBlur}
+                            aria-describedby="loanAmountHint"
+                          />
+                        </div>
                       </div>
                       <Slider
-                        className="mt-3"
                         value={[amount]}
-                        onValueChange={([v]) => setAmount(v)}
+                        onValueChange={([v]) => setAmountSynced(v)}
                         min={lendingPolicy.minLoanAmount}
                         max={lendingPolicy.maxLoanAmount}
                         step={500}
                       />
-                      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                      <div
+                        id="loanAmountHint"
+                        className="flex justify-between text-xs text-muted-foreground"
+                      >
                         <span>{kes(lendingPolicy.minLoanAmount)}</span>
                         <span>{kes(lendingPolicy.maxLoanAmount)}</span>
                       </div>

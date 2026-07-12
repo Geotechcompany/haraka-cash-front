@@ -132,6 +132,14 @@ function DecisionPage() {
 
   const quote = application.quote;
   const mpesaNumber = application.mpesaNumber?.trim() || "";
+  const requestedAmount = application.amount;
+  const offeredAmount = application.approvedAmount ?? quote.amount;
+  const isPartialOffer =
+    application.status === "Approved" &&
+    Number.isFinite(offeredAmount) &&
+    Number.isFinite(requestedAmount) &&
+    offeredAmount > 0 &&
+    offeredAmount < requestedAmount;
 
   if (application.status === "UnderReview") {
     return (
@@ -301,13 +309,27 @@ function DecisionPage() {
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
           <p className="mt-3 text-muted-foreground">
-            Pay the processing fee via M-Pesa to continue.
+            {isPartialOffer
+              ? `Based on your profile we can offer ${kes(offeredAmount)} of your ${kes(requestedAmount)} request.`
+              : "Pay the processing fee via M-Pesa to continue."}
           </p>
+          {isPartialOffer ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Pay the processing fee on this offer via M-Pesa to continue.
+            </p>
+          ) : null}
         </div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8 rounded-3xl gradient-brand text-white p-8 shadow-elevated">
-          <p className="text-sm opacity-80 uppercase tracking-wide">Eligible amount</p>
+          <p className="text-sm opacity-80 uppercase tracking-wide">
+            {isPartialOffer ? "Offered amount" : "Eligible amount"}
+          </p>
           <p className="mt-2 text-5xl md:text-6xl font-bold tabular-nums">{kes(quote.amount)}</p>
+          {isPartialOffer ? (
+            <p className="mt-2 text-sm opacity-80">
+              You requested {kes(requestedAmount)}
+            </p>
+          ) : null}
           <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
             {[
               { l: "Interest", v: kes(quote.interest) },
