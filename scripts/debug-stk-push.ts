@@ -5,7 +5,6 @@ import {
   getSmplyAuthHeaders,
   getSmplyPayConfigSummary,
   initiateProcessingFeeStkPush,
-  normalizeKenyanPhone,
 } from "../src/lib/smply-pay.server";
 import { loadProjectEnv } from "./load-env";
 
@@ -173,8 +172,6 @@ async function probeStkEndpoints(
     phone,
     amount,
     reference: `PROBE-${Date.now()}`,
-    description: "HarakaCash STK probe",
-    callbackUrl,
   });
   const found = await probeEndpoint("STK endpoint", paths, baseUrl, apiKey, body, clientId);
   if (!found) {
@@ -271,6 +268,7 @@ async function main() {
   info("API base", config.baseUrl);
   info("API key", config.apiKeyMasked ?? "(not set)");
   info("Client ID", config.clientIdMasked ?? (config.clientIdSet ? "(set)" : "(not set)"));
+  info("Project code", config.projectCode ?? "(not set)");
   info("App URL", config.appUrl);
   info("Callback URL", config.callbackUrl);
   info("STK path", config.paths.stk);
@@ -280,6 +278,11 @@ async function main() {
   info("Auth style", config.authStyle);
   info("Wallet path", config.paths.wallet);
   console.log();
+
+  if (!config.projectCode) {
+    fail("SMPLY_PAY_PROJECT_CODE is not set (wallet project code, e.g. WLT-CD-1MRWANZ)");
+    return;
+  }
 
   const hostname = new URL(config.baseUrl).hostname;
   const dnsOk = await testDns(hostname);
@@ -292,14 +295,12 @@ async function main() {
     await probeWalletEndpoints(config.baseUrl, config.paths.wallet);
   }
 
-  const phone = args.phone ? normalizeKenyanPhone(args.phone) : "254700000000";
+  const phone = args.phone ?? "0700000000";
   const reference = `DEBUG-${Date.now()}`;
   const stkBody = buildStkPushBody({
     phone,
     amount: args.amount,
     reference,
-    description: "HarakaCash STK debug",
-    callbackUrl: config.callbackUrl,
   });
 
   console.log(`\nSTK push target: POST ${config.stkUrl}`);
@@ -347,7 +348,7 @@ async function main() {
       phone,
       amount: args.amount,
       reference,
-      description: stkBody.description,
+      description: "HarakaCash STK debug",
     });
     pass(`STK push accepted (status: ${result.status})`);
     if (result.message) info("Provider message", result.message);

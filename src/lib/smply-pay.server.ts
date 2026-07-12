@@ -92,9 +92,27 @@ export function maskApiKey(key: string) {
   return `${key.slice(0, 4)}...${key.slice(-4)}`;
 }
 
+function getProjectCode() {
+  const projectCode = process.env.SMPLY_PAY_PROJECT_CODE?.trim();
+  if (!projectCode) {
+    throw new Error("SMPLY_PAY_PROJECT_CODE is not configured");
+  }
+  return projectCode;
+}
+
+/** SMPLY Pay STK docs use local 07… numbers, not 254… */
+export function toSmplyPhoneNumber(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("254") && digits.length >= 12) return `0${digits.slice(3)}`;
+  if (digits.startsWith("0")) return digits;
+  if (digits.length === 9) return `0${digits}`;
+  return digits;
+}
+
 export function getSmplyPayConfigSummary() {
   const key = process.env.SMPLY_PAY_API_KEY;
   const clientId = process.env.SMPLY_PAY_CLIENT_ID;
+  const projectCode = process.env.SMPLY_PAY_PROJECT_CODE;
   const withdrawPath = getApiPath("withdraw");
   return {
     baseUrl: getBaseUrl(),
@@ -102,6 +120,7 @@ export function getSmplyPayConfigSummary() {
     apiKeyMasked: key ? maskApiKey(key) : undefined,
     clientIdSet: Boolean(clientId),
     clientIdMasked: clientId ? maskApiKey(clientId) : undefined,
+    projectCode: projectCode || undefined,
     appUrl: process.env.APP_URL ?? process.env.VITE_APP_URL ?? "http://localhost:3000",
     callbackUrl: getCallbackUrl("/api/webhooks/smply-pay"),
     authStyle: getAuthStyle(),
@@ -184,23 +203,16 @@ export function buildStkPushBody(input: {
   phone: string;
   amount: number;
   reference: string;
-  description: string;
-  callbackUrl: string;
+  description?: string;
+  orderCode?: string;
+  projectCode?: string;
 }) {
-  const phone = normalizeKenyanPhone(input.phone);
-  const amount = Math.round(input.amount);
   return {
-    phone,
-    PhoneNumber: phone,
-    PartyA: phone,
-    amount,
-    Amount: amount,
-    reference: input.reference,
-    AccountReference: input.reference,
-    description: input.description,
-    TransactionDesc: input.description,
-    callback_url: input.callbackUrl,
-    CallBackURL: input.callbackUrl,
+    phoneNumber: toSmplyPhoneNumber(input.phone),
+    amount: String(Math.round(input.amount)),
+    projectCode: input.projectCode ?? getProjectCode(),
+    orderCode: input.orderCode ?? "",
+    transactionId: input.reference,
   };
 }
 
@@ -237,7 +249,6 @@ export async function initiateProcessingFeeStkPush(input: {
   reference: string;
   description: string;
 }) {
-  const callbackUrl = getCallbackUrl("/api/webhooks/smply-pay");
   const raw = await smplyRequest<Record<string, unknown>>(
     getApiPath("stk"),
     {
@@ -247,7 +258,6 @@ export async function initiateProcessingFeeStkPush(input: {
         amount: input.amount,
         reference: input.reference,
         description: input.description,
-        callbackUrl,
       }),
     },
     getStkUrl(),
@@ -320,13 +330,21 @@ export function parseSmplyWebhook(payload: unknown) {
   }
 
   const data = payload as Record<string, unknown>;
-  const reference = pickString(data, ["reference", "account_reference", "AccountReference"]);
+  const reference = pickString(data, [
+    "reference",
+    "transactionId",
+    "transaction_id",
+    "account_reference",
+    "AccountReference",
+  ]);
   const providerRef = pickString(data, [
     "transaction_id",
+    "transactionId",
     "checkout_request_id",
     "CheckoutRequestID",
     "withdrawal_id",
     "MpesaReceiptNumber",
+    "orderCode",
     "id",
   ]);
   const resultCode = pickString(data, ["result_code", "ResultCode", "code"]);

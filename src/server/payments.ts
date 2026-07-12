@@ -84,6 +84,7 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
       amount: fee,
       reference,
       description: `HarakaCash processing fee for ${application.applicationNumber}`,
+      orderCode: application.applicationNumber,
     });
 
     const payment: PaymentRecord = {
