@@ -35,7 +35,7 @@ function formatRelativeTime(date: Date) {
 export function toNotification(doc: NotificationRecord, index: number): Notification {
   const createdAt = doc.createdAt instanceof Date ? doc.createdAt : new Date(doc.createdAt);
   return {
-    id: doc._id ?? String(index + 1),
+    id: doc._id != null ? String(doc._id) : String(index + 1),
     title: doc.title,
     body: doc.body,
     type: doc.type,

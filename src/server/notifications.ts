@@ -5,13 +5,14 @@ import { toNotification, type NotificationRecord } from "@/lib/models/notificati
 
 export const listNotifications = createServerFn({ method: "GET" }).handler(async () => {
   const { userId } = await auth();
+  if (!userId) return [];
+
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
-  const filter = userId ? { clerkUserId: userId } : {};
 
   const docs = await db
     .collection<NotificationRecord>("notifications")
-    .find(filter)
+    .find({ clerkUserId: userId })
     .sort({ createdAt: -1 })
     .limit(50)
     .toArray();

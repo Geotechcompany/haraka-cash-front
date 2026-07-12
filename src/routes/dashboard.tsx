@@ -46,7 +46,7 @@ function Dashboard() {
     <AppShell>
       {/* Welcome */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 rounded-3xl gradient-brand text-white p-6 md:p-8 shadow-elevated relative overflow-hidden">
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 rounded-3xl gradient-brand text-white p-6 md:p-8 shadow-elevated relative overflow-hidden">
           <div className="absolute -top-20 -right-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden />
           <p className="text-sm opacity-80">Good morning,</p>
           <h1 className="text-2xl md:text-3xl font-bold mt-1">{user?.name ?? "HarakaCash user"}</h1>
@@ -73,7 +73,7 @@ function Dashboard() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-soft p-6">
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-soft p-6">
           {activeLoan ? (
             <>
               <div className="flex items-center justify-between">
