@@ -17,6 +17,12 @@ dist-ssr
 .nitro
 *.local
 
+# Saved SSR responses are diagnostic artifacts, not deployable app entry points.
+/dash.html
+/index.html
+/loans.html
+/login.html
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
