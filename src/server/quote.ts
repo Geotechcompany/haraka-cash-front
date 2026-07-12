@@ -2,10 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { buildLoanQuote } from "@/lib/loan";
+import { MAX_REPAYMENT_MONTHS } from "@/lib/lending-products";
 
 const generateLoanQuoteInput = z.object({
   amount: z.number().positive(),
-  months: z.number().int().min(1).max(36),
+  months: z.number().int().min(1).max(MAX_REPAYMENT_MONTHS),
   monthlyIncome: z.number().nonnegative().optional(),
   monthlyExpenses: z.number().nonnegative().optional(),
   existingLoans: z.number().nonnegative().optional(),
@@ -61,7 +62,7 @@ export const generateLoanQuote = createServerFn({ method: "POST" })
       Math.max(Math.round(data.amount), policy.minLoanAmount),
       policy.maxLoanAmount,
     );
-    const months = Math.min(Math.max(data.months, 1), 12);
+    const months = Math.min(Math.max(data.months, 1), MAX_REPAYMENT_MONTHS);
     const baseline = buildLoanQuote(amount, months, {
       monthlyInterestRatePercent: policy.monthlyInterestRate,
       minProcessingFee: policy.minProcessingFee,

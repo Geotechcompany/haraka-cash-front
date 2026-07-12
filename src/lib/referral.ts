@@ -35,6 +35,10 @@ export function referralInvitePath(code: string): string {
   return `/register?ref=${encodeURIComponent(code)}`;
 }
 
+export function referralShortLinkPath(code: string): string {
+  return `/r/${encodeURIComponent(code)}`;
+}
+
 export function persistReferralCode(raw: string): string | null {
   if (typeof window === "undefined") return null;
   const code = normalizeReferralCode(raw);

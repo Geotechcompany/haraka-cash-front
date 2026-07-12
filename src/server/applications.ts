@@ -13,6 +13,7 @@ import {
   type ApplicationDraftRecord,
 } from "@/lib/models/application-draft";
 import { normalizeDraftPayload } from "@/lib/application-draft";
+import { clampRepaymentMonths, MAX_REPAYMENT_MONTHS } from "@/lib/lending-products";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
 import { buildLoanQuote } from "@/lib/loan";
 import { isValidKenyanPhone } from "@/lib/kenya-format";
@@ -78,10 +79,13 @@ const draftFormSchema = z.object({
   idDocumentName: z.string().max(260).default(""),
 });
 
+const productTypeSchema = z.enum(["personal_loan", "salary_advance"]);
+
 const saveApplicationDraftInput = z.object({
   step: z.number().int().min(0).max(10),
   amount: z.number().positive(),
-  months: z.number().int().min(1).max(12),
+  months: z.number().int().min(1).max(MAX_REPAYMENT_MONTHS),
+  productType: productTypeSchema.default("personal_loan"),
   form: draftFormSchema,
 });
 
@@ -103,6 +107,7 @@ export const getApplicationDraft = createServerFn({ method: "GET" }).handler(asy
       step: doc.step,
       amount: doc.amount,
       months: doc.months,
+      productType: doc.productType ?? "personal_loan",
       form: doc.form,
     },
     {
@@ -220,7 +225,8 @@ const kenyanMobile = z
 
 const createApplicationInput = z.object({
   amount: z.number().positive(),
-  months: z.number().int().positive(),
+  months: z.number().int().min(1).max(MAX_REPAYMENT_MONTHS),
+  productType: productTypeSchema.default("personal_loan"),
   purpose: z.string().min(1).default("Personal"),
   phone: kenyanMobile,
   mpesaNumber: kenyanMobile,
@@ -268,7 +274,9 @@ export const createApplication = createServerFn({ method: "POST" })
     const applicationNumber = nextApplicationNumber(count);
     const applicant =
       [user.firstName, user.lastName].filter(Boolean).join(" ") || "HarakaCash user";
-    const quote = buildLoanQuote(data.amount, data.months, {
+    const months = clampRepaymentMonths(data.months);
+    const productType = data.productType ?? "personal_loan";
+    const quote = buildLoanQuote(data.amount, months, {
       monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
       minProcessingFee: lendingSettings.minProcessingFee,
     });
@@ -293,7 +301,8 @@ export const createApplication = createServerFn({ method: "POST" })
       existingLoans: data.existingLoans,
       rentMortgage: data.rentMortgage,
       amount: data.amount,
-      months: data.months,
+      months,
+      productType,
       purpose: data.purpose,
       eligibilityScore: user.eligibilityScore,
       riskScore: 100 - user.eligibilityScore,

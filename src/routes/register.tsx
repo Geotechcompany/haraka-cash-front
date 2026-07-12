@@ -5,6 +5,7 @@ import { ClerkSignUp } from "@/components/auth/clerk-auth-form";
 import { RedirectIfSignedIn } from "@/components/auth/auth-redirect";
 import { useEffect } from "react";
 import { persistReferralCode } from "@/lib/referral";
+import { trackReferralClick } from "@/server/referral-clicks";
 
 const registerSearchSchema = z.object({
   ref: z.string().optional(),
@@ -13,6 +14,11 @@ const registerSearchSchema = z.object({
 export const Route = createFileRoute("/register")({
   validateSearch: registerSearchSchema,
   head: () => ({ meta: [{ title: "Create account — HarakaCash" }] }),
+  loader: async ({ search }) => {
+    if (search.ref) {
+      await trackReferralClick({ data: { code: search.ref, source: "register" } });
+    }
+  },
   component: RegisterPage,
 });
 

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { kes } from "@/lib/loan";
+import { productTypeLabel } from "@/lib/lending-products";
 import type { PaymentStatus } from "@/lib/models/payment";
 import { toast } from "sonner";
 import { getApplication } from "@/server/applications";
@@ -308,6 +309,9 @@ function DecisionPage() {
           <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6 text-3xl md:text-4xl font-bold tracking-tight">
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
+          <p className="mt-2 text-sm font-medium text-primary">
+            {productTypeLabel(application.productType)}
+          </p>
           <p className="mt-3 text-muted-foreground">
             {isPartialOffer
               ? `Based on your profile we can offer ${kes(offeredAmount)} of your ${kes(requestedAmount)} request.`

@@ -1,4 +1,10 @@
 import type { ApplicationDraftFields, ApplicationDraftPayload } from "@/lib/models/application-draft";
+import {
+  clampRepaymentMonths,
+  DEFAULT_PRODUCT_TYPE,
+  DEFAULT_REPAYMENT_MONTHS,
+  type ProductType,
+} from "@/lib/lending-products";
 
 const MEANINGFUL_TEXT_KEYS = [
   "nationalId",
@@ -18,19 +24,24 @@ export function isDraftWorthSaving({
   step,
   amount,
   months,
+  productType,
   form,
   defaultAmount,
-  defaultMonths = 3,
+  defaultMonths = DEFAULT_REPAYMENT_MONTHS,
+  defaultProductType = DEFAULT_PRODUCT_TYPE,
 }: {
   step: number;
   amount: number;
   months: number;
+  productType?: ProductType;
   form: ApplicationDraftFields;
   defaultAmount: number;
   defaultMonths?: number;
+  defaultProductType?: ProductType;
 }): boolean {
   if (step > 0) return true;
   if (amount !== defaultAmount || months !== defaultMonths) return true;
+  if (productType && productType !== defaultProductType) return true;
   return MEANINGFUL_TEXT_KEYS.some((key) => form[key].trim() !== "");
 }
 
@@ -46,7 +57,8 @@ export function normalizeDraftPayload(
   return {
     step: clampDraftStep(payload.step, options.maxStep),
     amount: Math.min(Math.max(payload.amount, options.minAmount), options.maxAmount),
-    months: Math.min(Math.max(Math.floor(payload.months) || 1, 1), 12),
+    months: clampRepaymentMonths(payload.months),
+    productType: payload.productType === "salary_advance" ? "salary_advance" : "personal_loan",
     form: {
       fullName: payload.form.fullName ?? "",
       nationalId: payload.form.nationalId ?? "",

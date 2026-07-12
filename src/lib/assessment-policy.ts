@@ -6,6 +6,7 @@ import {
   type AssessmentStepStatus,
 } from "@/lib/assessment-steps";
 import { buildLoanQuote, MONTHLY_INTEREST } from "@/lib/loan";
+import { DEFAULT_REPAYMENT_MONTHS } from "@/lib/lending-products";
 
 export type AssessmentDecisionHint = "approve" | "decline" | "manual_review";
 
@@ -277,7 +278,7 @@ export function resolveAffordableApprovedAmount(input: {
     return request;
   }
 
-  const months = Math.max(1, Math.round(input.months ?? 3));
+  const months = Math.max(1, Math.round(input.months ?? DEFAULT_REPAYMENT_MONTHS));
   const ceiling = computeAffordabilityCeiling({
     profile,
     minLoanAmount: input.minLoanAmount,

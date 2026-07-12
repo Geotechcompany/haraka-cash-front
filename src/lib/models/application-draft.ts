@@ -1,3 +1,5 @@
+import type { ProductType } from "@/lib/lending-products";
+
 /** In-progress apply wizard payload persisted per signed-in user. */
 export type ApplicationDraftFields = {
   fullName: string;
@@ -21,6 +23,7 @@ export type ApplicationDraftPayload = {
   step: number;
   amount: number;
   months: number;
+  productType: ProductType;
   form: ApplicationDraftFields;
 };
 
@@ -40,6 +43,7 @@ export function toApplicationDraft(doc: ApplicationDraftRecord): ApplicationDraf
     step: doc.step,
     amount: doc.amount,
     months: doc.months,
+    productType: doc.productType ?? "personal_loan",
     form: doc.form,
     updatedAt: doc.updatedAt instanceof Date ? doc.updatedAt.toISOString() : String(doc.updatedAt),
   };

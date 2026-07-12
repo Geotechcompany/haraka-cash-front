@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, Copy, Gift, Users } from "lucide-react";
+import { Check, Copy, Gift, Users, MousePointerClick, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
@@ -22,10 +22,12 @@ function ReferralsPage() {
   const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState(false);
   const [inviteUrl, setInviteUrl] = useState(program.invitePath);
+  const [shortUrl, setShortUrl] = useState(program.shortLinkPath);
 
   useEffect(() => {
     setInviteUrl(`${window.location.origin}${program.invitePath}`);
-  }, [program.invitePath]);
+    setShortUrl(`${window.location.origin}${program.shortLinkPath}`);
+  }, [program.invitePath, program.shortLinkPath]);
 
   const copyLink = async () => {
     const url = `${window.location.origin}${program.invitePath}`;
@@ -75,6 +77,9 @@ function ReferralsPage() {
           <p className="mt-3 break-all font-mono text-sm leading-relaxed text-white/95 md:text-base">
             {inviteUrl}
           </p>
+          <p className="mt-2 text-xs text-white/70">
+            Short link: <span className="font-mono text-white/90">{shortUrl}</span>
+          </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button
               type="button"
@@ -104,8 +109,32 @@ function ReferralsPage() {
           transition={
             reduceMotion ? { duration: 0.2, delay: 0.1 } : { ...springEnter, delay: 0.1 }
           }
-          className="mt-5 grid grid-cols-2 divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:grid-cols-3 sm:divide-x"
+          className="mt-5 grid grid-cols-2 divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:grid-cols-3 lg:grid-cols-6 sm:divide-x"
         >
+          <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Link clicks
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums">
+              <MousePointerClick className="h-4 w-4 text-primary" aria-hidden />
+              {program.linkClicks}
+            </p>
+          </div>
+          <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Signups
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums">
+              <Users className="h-4 w-4 text-primary" aria-hidden />
+              {program.signups}
+            </p>
+          </div>
+          <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Conversion
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tabular-nums">{program.conversionRate}%</p>
+          </div>
           <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
             <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Joined
@@ -136,6 +165,58 @@ function ReferralsPage() {
             </p>
           </div>
         </motion.div>
+
+        {program.recentClicks.length > 0 && (
+          <motion.section
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={
+              reduceMotion ? { duration: 0.2, delay: 0.12 } : { ...springEnter, delay: 0.12 }
+            }
+            className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
+          >
+            <div className="px-5 py-4 md:px-6">
+              <h2 className="font-semibold tracking-tight">Recent link clicks</h2>
+              <p className="text-xs text-muted-foreground">
+                Approximate location from IP — raw addresses are never shown
+              </p>
+            </div>
+            <ul className="divide-y divide-border">
+              {program.recentClicks.map((click) => (
+                <li
+                  key={click.id}
+                  className="flex items-center justify-between gap-3 px-5 py-3.5 md:px-6"
+                >
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 truncate text-sm font-medium">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                      {click.location}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(click.createdAt).toLocaleDateString("en-KE", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {click.source === "shortlink" ? "Short link" : "Register link"}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      click.converted
+                        ? "rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success"
+                        : "rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                    }
+                  >
+                    {click.converted ? "Signed up" : "Clicked"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.section>
+        )}
 
         <motion.section
           initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}

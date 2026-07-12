@@ -2,8 +2,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowRight, Upload, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Upload, Loader2, CheckCircle2, Wallet, Banknote } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,17 @@ import { buildLoanQuote, kes } from "@/lib/loan";
 import { kenyanNationalIdError, kenyanPhoneError } from "@/lib/kenya-format";
 import { cn } from "@/lib/utils";
 import {
+  clampRepaymentMonths,
+  DEFAULT_PRODUCT_TYPE,
+  DEFAULT_REPAYMENT_MONTHS,
+  defaultAmountForProduct,
+  formatRepaymentMonths,
+  formatRepaymentPeriod,
+  parseProductTypeFromSearch,
+  productTypeLabel,
+  type ProductType,
+} from "@/lib/lending-products";
+import {
   createApplication,
   getApplicationDraft,
   getCurrentUser,
@@ -31,15 +43,43 @@ import {
 import { generateLoanQuote, type GeneratedLoanQuote } from "@/server/quote";
 import { getPublicLendingPolicy } from "@/server/settings";
 
+const applySearchSchema = z.object({
+  product: z.string().optional(),
+  type: z.string().optional(),
+});
+
 export const Route = createFileRoute("/apply")({
-  head: () => ({ meta: [{ title: "Apply for a loan — HarakaCash" }] }),
-  loader: async () => {
+  validateSearch: applySearchSchema,
+  loaderDeps: ({ search }) => ({
+    product: search?.product,
+    type: search?.type,
+  }),
+  loader: async ({ deps }) => {
     const [user, lendingPolicy, draft] = await Promise.all([
       getCurrentUser(),
       getPublicLendingPolicy(),
       getApplicationDraft(),
     ]);
-    return { user, lendingPolicy, draft };
+    const preselectedProduct = parseProductTypeFromSearch(deps);
+    return { user, lendingPolicy, draft, preselectedProduct };
+  },
+  head: ({ loaderData }) => {
+    const isSalaryAdvance = loaderData?.preselectedProduct === "salary_advance";
+    return {
+      meta: [
+        {
+          title: isSalaryAdvance
+            ? "Apply for salary advance — HarakaCash"
+            : "Apply for a loan — HarakaCash",
+        },
+        {
+          name: "description",
+          content: isSalaryAdvance
+            ? "Request a salary advance repaid on your next pay. M-Pesa payout after approval and CRB clearance."
+            : "Apply for a personal loan with clear fees and M-Pesa payout after approval.",
+        },
+      ],
+    };
   },
   component: ApplyPage,
 });
@@ -74,20 +114,32 @@ type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 function ApplyPage() {
   const { user, lendingPolicy, draft } = Route.useLoaderData();
+  const search = Route.useSearch();
   const navigate = useNavigate();
   const createApplicationFn = useServerFn(createApplication);
   const saveApplicationDraftFn = useServerFn(saveApplicationDraft);
   const generateLoanQuoteFn = useServerFn(generateLoanQuote);
-  const defaultAmount = Math.min(
+  const urlProductType = parseProductTypeFromSearch(search);
+  const policyDefaultAmount = Math.min(
     Math.max(10_000, lendingPolicy.minLoanAmount),
     lendingPolicy.maxLoanAmount,
   );
+  const initialProductType: ProductType =
+    draft?.productType ?? urlProductType ?? DEFAULT_PRODUCT_TYPE;
+  const defaultAmount = defaultAmountForProduct(
+    initialProductType,
+    policyDefaultAmount,
+    lendingPolicy.minLoanAmount,
+  );
+  const [productType, setProductType] = useState<ProductType>(initialProductType);
   const [step, setStep] = useState(() => draft?.step ?? 0);
   const [amount, setAmount] = useState(() => draft?.amount ?? defaultAmount);
   const [amountInput, setAmountInput] = useState(() =>
     String(draft?.amount ?? defaultAmount),
   );
-  const [months, setMonths] = useState(() => draft?.months ?? 3);
+  const [months, setMonths] = useState(() =>
+    clampRepaymentMonths(draft?.months ?? DEFAULT_REPAYMENT_MONTHS),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [quoteUpdating, setQuoteUpdating] = useState(false);
@@ -118,7 +170,8 @@ function ApplyPage() {
   const latestDraftRef = useRef({
     step: draft?.step ?? 0,
     amount: draft?.amount ?? defaultAmount,
-    months: draft?.months ?? 3,
+    months: clampRepaymentMonths(draft?.months ?? DEFAULT_REPAYMENT_MONTHS),
+    productType: initialProductType,
     form,
   });
 
@@ -211,6 +264,26 @@ function ApplyPage() {
     setAmountSynced(Number.isFinite(parsed) ? parsed : amount);
   };
 
+  const onProductTypeChange = (next: ProductType) => {
+    setProductType(next);
+    setMonths(DEFAULT_REPAYMENT_MONTHS);
+    const nextDefault = defaultAmountForProduct(
+      next,
+      policyDefaultAmount,
+      lendingPolicy.minLoanAmount,
+    );
+    if (next === "salary_advance" && amount > nextDefault) {
+      setAmountSynced(nextDefault);
+    }
+  };
+
+  useEffect(() => {
+    if (draft?.productType) return;
+    if (!urlProductType || urlProductType === productType) return;
+    onProductTypeChange(urlProductType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync URL preselect once on load
+  }, [urlProductType]);
+
   useEffect(() => {
     setAttempted(false);
   }, [step]);
@@ -229,8 +302,8 @@ function ApplyPage() {
   }, [draft]);
 
   useEffect(() => {
-    latestDraftRef.current = { step, amount, months, form };
-  }, [step, amount, months, form]);
+    latestDraftRef.current = { step, amount, months, productType, form };
+  }, [step, amount, months, productType, form]);
 
   useEffect(() => {
     if (!user || !draftHydrated) return;
@@ -239,6 +312,7 @@ function ApplyPage() {
       step,
       amount,
       months,
+      productType,
       form,
       defaultAmount,
     });
@@ -251,7 +325,7 @@ function ApplyPage() {
 
     const timer = window.setTimeout(() => {
       setSaveStatus("saving");
-      void saveApplicationDraftFn({ data: { step, amount, months, form } })
+      void saveApplicationDraftFn({ data: { step, amount, months, productType, form } })
         .then(() => {
           setSaveStatus("saved");
         })
@@ -267,6 +341,7 @@ function ApplyPage() {
     step,
     amount,
     months,
+    productType,
     form,
     defaultAmount,
     saveApplicationDraftFn,
@@ -282,6 +357,7 @@ function ApplyPage() {
           step: snapshot.step,
           amount: snapshot.amount,
           months: snapshot.months,
+          productType: snapshot.productType,
           form: snapshot.form,
           defaultAmount,
         })
@@ -293,6 +369,7 @@ function ApplyPage() {
           step: snapshot.step,
           amount: snapshot.amount,
           months: snapshot.months,
+          productType: snapshot.productType,
           form: snapshot.form,
         },
       }).catch(() => {
@@ -384,6 +461,7 @@ function ApplyPage() {
         data: {
           amount,
           months,
+          productType,
           purpose: form.purpose,
           phone: form.phone.trim(),
           mpesaNumber: form.mpesaNumber.trim(),
@@ -437,9 +515,13 @@ function ApplyPage() {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Apply for a loan</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                Apply for {productType === "salary_advance" ? "a salary advance" : "a loan"}
+              </h1>
               <p className="mt-2 text-muted-foreground">
-                Answer a few quick questions to get a decision.
+                {productType === "salary_advance"
+                  ? "Short-term cash against your next salary, repaid in one month."
+                  : "Answer a few quick questions to get a decision."}
               </p>
             </div>
             {user && saveLabel ? (
@@ -520,7 +602,27 @@ function ApplyPage() {
                 </div>
 
                 {step === 0 && (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label>Product type</Label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <ProductTypeOption
+                          selected={productType === "personal_loan"}
+                          onSelect={() => onProductTypeChange("personal_loan")}
+                          icon={Wallet}
+                          title="Personal loan"
+                          description="For business, school fees, rent, or emergencies. Repaid in one month."
+                        />
+                        <ProductTypeOption
+                          selected={productType === "salary_advance"}
+                          onSelect={() => onProductTypeChange("salary_advance")}
+                          icon={Banknote}
+                          title="Salary advance"
+                          description="Cash until your next pay day. One-month term, M-Pesa payout."
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
                     <Field
                       label="Full name"
                       name="fullName"
@@ -561,6 +663,7 @@ function ApplyPage() {
                       required
                       error={showError("mpesaNumber")}
                     />
+                    </div>
                   </div>
                 )}
 
@@ -679,6 +782,12 @@ function ApplyPage() {
 
                 {step === 3 && (
                   <div className="space-y-6">
+                    {productType === "salary_advance" ? (
+                      <p className="rounded-xl border border-primary/20 bg-primary-soft/40 px-4 py-3 text-sm text-muted-foreground">
+                        This advance is repaid from your next salary within one month. Amount should
+                        fit what you can clear on pay day.
+                      </p>
+                    ) : null}
                     <div className="space-y-3">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <Label htmlFor="loanAmount">Loan amount (KES)</Label>
@@ -717,18 +826,11 @@ function ApplyPage() {
                     <div>
                       <div className="flex justify-between">
                         <Label>Repayment period</Label>
-                        <span className="text-lg font-bold">
-                          {months} month{months > 1 ? "s" : ""}
-                        </span>
+                        <span className="text-lg font-bold">{formatRepaymentMonths(months)}</span>
                       </div>
-                      <Slider
-                        className="mt-3"
-                        value={[months]}
-                        onValueChange={([v]) => setMonths(v)}
-                        min={1}
-                        max={12}
-                        step={1}
-                      />
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        All HarakaCash products repay in one month.
+                      </p>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="purpose">
@@ -844,8 +946,14 @@ function ApplyPage() {
                         !stepValid && "opacity-70",
                       )}
                     >
-                      <Sparkles className="mr-1 h-4 w-4" />{" "}
-                      {submitting ? "Submitting..." : "Submit application"}
+                      {submitting ? (
+                        <>
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit application"
+                      )}
                     </Button>
                   )}
                 </div>
@@ -862,8 +970,9 @@ function ApplyPage() {
                 </span>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">{productTypeLabel(productType)}</p>
             <p className="mt-2 text-3xl font-bold tabular-nums">{kes(quote.amount)}</p>
-            <p className="text-xs text-muted-foreground">{quote.months} month repayment</p>
+            <p className="text-xs text-muted-foreground">{formatRepaymentPeriod(quote.months)}</p>
             <div className="mt-5 space-y-3 text-sm">
               <Row label="Principal" value={kes(quote.amount)} />
               <Row label={`Interest (${quote.months}mo)`} value={kes(quote.interest)} />
@@ -960,6 +1069,42 @@ function validateStep(step: number, form: FormState): FieldErrors {
   }
 
   return errors;
+}
+
+function ProductTypeOption({
+  selected,
+  onSelect,
+  icon: Icon,
+  title,
+  description,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "card-soft p-4 text-left transition-all hover:border-primary hover:shadow-elevated",
+        selected && "border-primary ring-2 ring-primary/20",
+      )}
+    >
+      <div
+        className={cn(
+          "h-9 w-9 rounded-xl grid place-items-center",
+          selected ? "gradient-brand text-white" : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="mt-3 font-semibold">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{description}</p>
+    </button>
+  );
 }
 
 function Field({

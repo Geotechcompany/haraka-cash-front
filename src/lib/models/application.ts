@@ -1,3 +1,5 @@
+import type { ProductType } from "@/lib/lending-products";
+
 export type ApplicationStatus =
   | "Pending"
   | "Approved"
@@ -37,6 +39,7 @@ export type ApplicationRecord = {
   /** Offered / approved principal after assessment (KES). ≤ amount when set. */
   approvedAmount?: number;
   months: number;
+  productType?: ProductType;
   purpose: string;
   eligibilityScore: number;
   riskScore: number;
@@ -73,6 +76,7 @@ export type Application = {
   /** Offered principal after assessment (KES). Present when approved (may equal amount). */
   approvedAmount?: number;
   months: number;
+  productType?: ProductType;
   purpose: string;
   eligibilityScore: number;
   riskScore: number;
@@ -105,6 +109,7 @@ export function toApplication(doc: ApplicationRecord): Application {
     amount: doc.amount,
     approvedAmount: doc.approvedAmount,
     months: doc.months,
+    productType: doc.productType ?? "personal_loan",
     purpose: doc.purpose,
     eligibilityScore: doc.eligibilityScore,
     riskScore: doc.riskScore,

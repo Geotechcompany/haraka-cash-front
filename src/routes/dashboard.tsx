@@ -6,6 +6,9 @@ import {
   Plus,
   FileText,
   Gift,
+  MousePointerClick,
+  MapPin,
+  Users,
 } from "lucide-react";
 import {
   AreaChart,
@@ -23,23 +26,26 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { kes } from "@/lib/loan";
+import { productTypeLabel } from "@/lib/lending-products";
 import { applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getCurrentUser, listApplications } from "@/server/applications";
 import { getDashboardStats, getUserLoanHistory } from "@/server/analytics";
 import { listNotifications } from "@/server/notifications";
+import { getReferralProgram } from "@/server/referrals";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HarakaCash" }] }),
   loader: async () => {
-    const [user, applications, notifications, loanHistory, stats] = await Promise.all([
+    const [user, applications, notifications, loanHistory, stats, referrals] = await Promise.all([
       getCurrentUser(),
       listApplications({ data: { scope: "mine" } }),
       listNotifications(),
       getUserLoanHistory(),
       getDashboardStats(),
+      getReferralProgram(),
     ]);
-    return { user, applications, notifications, loanHistory, stats };
+    return { user, applications, notifications, loanHistory, stats, referrals };
   },
   component: Dashboard,
 });
@@ -64,7 +70,7 @@ function greetingForHour(hour: number) {
 }
 
 function Dashboard() {
-  const { user, applications, notifications, loanHistory, stats } = Route.useLoaderData();
+  const { user, applications, notifications, loanHistory, stats, referrals } = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
   const recent = applications.slice(0, 5);
   const activeLoan = applications.find(
@@ -260,6 +266,78 @@ function Dashboard() {
         ))}
       </motion.div>
 
+      <motion.section
+        {...enter(STAGGER_MS * 2.5)}
+        className="mt-5 overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-6">
+          <div>
+            <h2 className="font-semibold tracking-tight">Referral performance</h2>
+            <p className="text-xs text-muted-foreground">Link clicks and signups from your invite</p>
+          </div>
+          <Button asChild variant="ghost" size="sm" className="rounded-lg">
+            <Link to="/referrals">Manage referrals</Link>
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 divide-border border-t border-border sm:divide-x">
+          <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Link clicks
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums">
+              <MousePointerClick className="h-4 w-4 text-primary" aria-hidden />
+              {referrals.linkClicks}
+            </p>
+          </div>
+          <div className="border-b border-border px-4 py-4 sm:border-b-0 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Signups
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums">
+              <Users className="h-4 w-4 text-primary" aria-hidden />
+              {referrals.signups}
+            </p>
+          </div>
+          <div className="col-span-3 px-4 py-4 sm:col-span-1 sm:px-5">
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Conversion
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tabular-nums">{referrals.conversionRate}%</p>
+          </div>
+        </div>
+        {referrals.recentClicks.length > 0 && (
+          <ul className="divide-y divide-border border-t border-border">
+            {referrals.recentClicks.slice(0, 3).map((click) => (
+              <li
+                key={click.id}
+                className="flex items-center justify-between gap-3 px-5 py-3 md:px-6"
+              >
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 truncate text-sm font-medium">
+                    <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    {click.location}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(click.createdAt).toLocaleDateString("en-KE", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <Badge
+                  variant={click.converted ? "default" : "secondary"}
+                  className="shrink-0 rounded-full"
+                >
+                  {click.converted ? "Signed up" : "Clicked"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </motion.section>
+
       {/* Activity */}
       <div className="mt-6 grid gap-4 lg:grid-cols-5 lg:gap-5">
         <motion.section
@@ -302,6 +380,7 @@ function Dashboard() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{app.purpose}</p>
                     <p className="text-xs text-muted-foreground">
+                      {productTypeLabel(app.productType)} ·{" "}
                       {new Date(app.createdAt).toLocaleDateString("en-KE", {
                         day: "numeric",
                         month: "short",

@@ -27,11 +27,25 @@ describe("isDraftWorthSaving", () => {
       isDraftWorthSaving({
         step: 0,
         amount: 10_000,
-        months: 3,
+        months: 1,
         form: emptyForm,
         defaultAmount: 10_000,
       }),
       false,
+    );
+  });
+
+  it("saves when product type changes from default", () => {
+    assert.equal(
+      isDraftWorthSaving({
+        step: 0,
+        amount: 10_000,
+        months: 1,
+        productType: "salary_advance",
+        form: emptyForm,
+        defaultAmount: 10_000,
+      }),
+      true,
     );
   });
 
@@ -40,7 +54,7 @@ describe("isDraftWorthSaving", () => {
       isDraftWorthSaving({
         step: 1,
         amount: 10_000,
-        months: 3,
+        months: 1,
         form: emptyForm,
         defaultAmount: 10_000,
       }),
@@ -53,7 +67,7 @@ describe("isDraftWorthSaving", () => {
       isDraftWorthSaving({
         step: 0,
         amount: 10_000,
-        months: 3,
+        months: 1,
         form: { ...emptyForm, nationalId: "12345678" },
         defaultAmount: 10_000,
       }),
@@ -66,7 +80,7 @@ describe("isDraftWorthSaving", () => {
       isDraftWorthSaving({
         step: 0,
         amount: 15_000,
-        months: 3,
+        months: 1,
         form: emptyForm,
         defaultAmount: 10_000,
       }),
@@ -90,13 +104,15 @@ describe("normalizeDraftPayload", () => {
         step: 99,
         amount: 1,
         months: 99,
+        productType: "salary_advance",
         form: { ...emptyForm, employmentStatus: "", purpose: "" },
       },
       { maxStep: 4, minAmount: 5_000, maxAmount: 50_000 },
     );
     assert.equal(normalized.step, 4);
     assert.equal(normalized.amount, 5_000);
-    assert.equal(normalized.months, 12);
+    assert.equal(normalized.months, 1);
+    assert.equal(normalized.productType, "salary_advance");
     assert.equal(normalized.form.employmentStatus, "Employed");
     assert.equal(normalized.form.purpose, "Business");
   });

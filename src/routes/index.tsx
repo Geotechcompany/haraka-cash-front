@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowRight, Gift, LayoutDashboard } from "lucide-react";
+import { ArrowRight, Gift, LayoutDashboard, Wallet, Banknote } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -11,16 +11,16 @@ import { kes } from "@/lib/loan";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "HarakaCash — Loans to M-Pesa in minutes" },
+      { title: "HarakaCash — M-Pesa Loans & Salary Advance Kenya" },
       {
         name: "description",
         content:
-          "Borrow up to KES 250,000 with clear fees, instant decisions, and payout to M-Pesa. Built for Kenya.",
+          "Personal loans and salary advances to M-Pesa. Clear fees, one-month terms, instant decisions. Built for Kenya.",
       },
-      { property: "og:title", content: "HarakaCash — Loans to M-Pesa in minutes" },
+      { property: "og:title", content: "HarakaCash — M-Pesa Loans & Salary Advance Kenya" },
       {
         property: "og:description",
-        content: "Clear fees. Instant decisions. Payout to M-Pesa.",
+        content: "Borrow to M-Pesa or advance against your next salary. Clear fees. Fast decisions.",
       },
       { property: "og:image", content: "/logo.png" },
     ],
@@ -38,6 +38,10 @@ const faqs = [
   {
     q: "How much can I borrow?",
     a: "First loans go up to KES 20,000. Limits climb toward KES 250,000 as you repay on time.",
+  },
+  {
+    q: "What is a salary advance?",
+    a: "A short-term advance against your next pay cheque. You borrow now, repay in one month when salary lands on M-Pesa.",
   },
   {
     q: "How fast is disbursement?",
@@ -74,6 +78,9 @@ function Landing() {
         <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Logo height={64} className="max-h-11 max-w-[200px] sm:max-h-16 sm:max-w-[280px]" />
           <nav className="ml-8 hidden items-center gap-1 text-sm md:flex" aria-label="Primary">
+            <a href="#products" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              Products
+            </a>
             <a href="#how" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
               How it works
             </a>
@@ -236,6 +243,71 @@ function Landing() {
         </div>
       </section>
 
+      <section id="products" className="border-t bg-muted/20">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <motion.div
+            initial={reduceMotion ? false : { y: 12 }}
+            whileInView={{ y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={springEnter}
+            className="max-w-2xl"
+          >
+            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Two ways to borrow
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Pick what fits today. Both pay out to M-Pesa after approval and CRB clearance.
+            </p>
+          </motion.div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            <motion.article
+              initial={reduceMotion ? false : { y: 14 }}
+              whileInView={{ y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={springEnter}
+              className="card-soft flex flex-col p-6 md:p-8"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl gradient-brand text-white">
+                <Wallet className="h-5 w-5" aria-hidden />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold">Personal loan</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                For stock, school fees, rent, or emergencies. One-month term with fees shown before
+                you accept.
+              </p>
+              <Button asChild className="mt-6 w-fit rounded-xl gradient-brand text-white shadow-soft">
+                <Link to="/apply" search={{ product: "personal-loan" }}>
+                  Apply for a loan <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.article>
+
+            <motion.article
+              initial={reduceMotion ? false : { y: 14 }}
+              whileInView={{ y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ ...springEnter, delay: reduceMotion ? 0 : 0.06 }}
+              className="card-soft flex flex-col p-6 md:p-8"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                <Banknote className="h-5 w-5" aria-hidden />
+              </div>
+              <h3 className="mt-4 text-xl font-semibold">Salary advance</h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                Bridge to pay day. Borrow against your next salary, repay in one month when M-Pesa
+                credit hits.
+              </p>
+              <Button asChild variant="outline" className="mt-6 w-fit rounded-xl">
+                <Link to="/apply" search={{ product: "salary-advance" }}>
+                  Apply for salary advance <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.article>
+          </div>
+        </div>
+      </section>
+
       <section id="how" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         <motion.div
           initial={reduceMotion ? false : { y: 12 }}
@@ -342,16 +414,28 @@ function Landing() {
           className="landing-hero-plane relative overflow-hidden rounded-[1.75rem] px-8 py-12 text-white shadow-elevated sm:px-12 sm:py-16"
         >
           <h2 className="font-display max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
-            Borrow what you need. Repay on your schedule.
+            Borrow what you need. Repay in one month.
           </h2>
           <p className="mt-3 max-w-lg text-white/85">
-            Open an account, submit one application, and review your offer before you accept.
+            Personal loan or salary advance — same clear offer, same M-Pesa payout after CRB clearance.
           </p>
-          <Button asChild size="lg" className="mt-8 h-12 rounded-xl bg-white px-6 text-base font-semibold text-[oklch(0.35_0.16_258)] hover:bg-white/95">
-            <Link to="/register">
-              Create account <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild size="lg" className="h-12 rounded-xl bg-white px-6 text-base font-semibold text-[oklch(0.35_0.16_258)] hover:bg-white/95">
+              <Link to="/register">
+                Create account <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="h-12 rounded-xl border-white/35 bg-white/5 px-6 text-base text-white backdrop-blur-sm hover:bg-white/10 hover:text-white"
+            >
+              <Link to="/apply" search={{ product: "salary-advance" }}>
+                Salary advance
+              </Link>
+            </Button>
+          </div>
         </motion.div>
       </section>
 
@@ -369,6 +453,7 @@ function Landing() {
                 heading: "Product",
                 links: [
                   ["Apply", isSignedIn ? "/apply" : "/register"],
+                  ["Salary advance", isSignedIn ? "/apply?product=salary-advance" : "/register"],
                   ["Dashboard", "/dashboard"],
                   ["How it works", "#how"],
                 ],
@@ -405,6 +490,20 @@ function Landing() {
           </div>
         </div>
       </footer>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((item) => ({
+              "@type": "Question",
+              name: item.q,
+              acceptedAnswer: { "@type": "Answer", text: item.a },
+            })),
+          }),
+        }}
+      />
     </div>
   );
 }

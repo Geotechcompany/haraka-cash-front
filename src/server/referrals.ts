@@ -12,6 +12,7 @@ import {
   isValidReferralCodeFormat,
   normalizeReferralCode,
   referralInvitePath,
+  referralShortLinkPath,
 } from "@/lib/referral";
 import { requireAdmin, requireUserId } from "@/server/auth";
 
@@ -122,6 +123,10 @@ export async function awardReferralOnSignup(params: {
         },
       },
     );
+    const { convertReferralClick: convertCapReferralClick } = await import(
+      "@/server/referral-clicks.server"
+    );
+    await convertCapReferralClick({ code, refereeClerkId: params.refereeClerkId });
     return { awarded: false, reason: "cap_reached" };
   }
 
@@ -157,6 +162,9 @@ export async function awardReferralOnSignup(params: {
       },
     },
   );
+
+  const { convertReferralClick } = await import("@/server/referral-clicks.server");
+  await convertReferralClick({ code, refereeClerkId: params.refereeClerkId });
 
   await users.updateOne(
     { clerkId: referrer.clerkId },
@@ -207,12 +215,23 @@ export const claimReferral = createServerFn({ method: "POST" })
 export type ReferralProgramStats = {
   code: string;
   invitePath: string;
+  shortLinkPath: string;
   successfulReferrals: number;
   creditsEarned: number;
   creditPerReferral: number;
   maxReferrals: number;
   maxCredits: number;
   remainingSlots: number;
+  linkClicks: number;
+  signups: number;
+  conversionRate: number;
+  recentClicks: Array<{
+    id: string;
+    location: string;
+    source: string;
+    converted: boolean;
+    createdAt: string;
+  }>;
   recent: Array<{
     id: string;
     creditAwarded: number;
@@ -233,12 +252,16 @@ export const getReferralProgram = createServerFn({ method: "GET" }).handler(
     const user = await ensureReferralCode(existing);
     const code = user.referralCode!;
 
-    const recentDocs = await db
-      .collection<ReferralRecord>("referrals")
-      .find({ referrerClerkId: clerkId })
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .toArray();
+    const { getReferralClickStats } = await import("@/server/referral-clicks.server");
+    const [recentDocs, clickStats] = await Promise.all([
+      db
+        .collection<ReferralRecord>("referrals")
+        .find({ referrerClerkId: clerkId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .toArray(),
+      getReferralClickStats(clerkId),
+    ]);
 
     const successfulReferrals = user.referralCount ?? 0;
     const creditsEarned = user.referralCreditsEarned ?? 0;
@@ -246,12 +269,17 @@ export const getReferralProgram = createServerFn({ method: "GET" }).handler(
     return {
       code,
       invitePath: referralInvitePath(code),
+      shortLinkPath: referralShortLinkPath(code),
       successfulReferrals,
       creditsEarned,
       creditPerReferral: REFERRAL_CREDIT_PER_SIGNUP,
       maxReferrals: REFERRAL_MAX_AWARDS,
       maxCredits: REFERRAL_MAX_CREDIT,
       remainingSlots: Math.max(0, REFERRAL_MAX_AWARDS - successfulReferrals),
+      linkClicks: clickStats.linkClicks,
+      signups: clickStats.signups,
+      conversionRate: clickStats.conversionRate,
+      recentClicks: clickStats.recentClicks,
       recent: recentDocs.map((doc, index) => ({
         id: toReferralSummary(doc, index).id,
         creditAwarded: doc.creditAwarded,
