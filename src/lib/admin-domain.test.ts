@@ -8,6 +8,18 @@ import {
   isAdminMetadata,
 } from "@/lib/admin-domain";
 import { toPlatformSettings } from "@/lib/models/settings";
+import { createReportFileResponse, type ReportRow } from "@/server/reports";
+
+const reportRows: ReportRow[] = [
+  {
+    reference: "RP-001",
+    applicationNumber: "HC-001",
+    phone: "254700000001",
+    amount: 3_300,
+    status: "success",
+    createdAt: "2026-04-01T00:00:00.000Z",
+  },
+];
 
 test("admin authorization accepts only explicit admin metadata", () => {
   assert.equal(isAdminMetadata({ role: "admin" }), true);
@@ -86,4 +98,35 @@ test("platform settings mapper supplies defaults for legacy records", () => {
   assert.equal(settings.minLoanAmount, 1_000);
   assert.equal(settings.maxLoanAmount, 75_000);
   assert.equal(settings.monthlyInterestRate, 6);
+});
+
+test("CSV report response sets download headers and serializes rows", async () => {
+  const response = await createReportFileResponse({
+    title: "Repayments",
+    filename: "repayments.csv",
+    format: "csv",
+    rows: reportRows,
+  });
+  assert.equal(response.headers.get("content-type"), "text/csv; charset=utf-8");
+  assert.equal(
+    response.headers.get("content-disposition"),
+    'attachment; filename="repayments.csv"',
+  );
+  assert.match(await response.text(), /RP-001,HC-001/);
+});
+
+test("PDF report response sets download headers and emits a PDF", async () => {
+  const response = await createReportFileResponse({
+    title: "Repayments",
+    filename: "repayments.pdf",
+    format: "pdf",
+    rows: reportRows,
+  });
+  assert.equal(response.headers.get("content-type"), "application/pdf");
+  assert.equal(
+    response.headers.get("content-disposition"),
+    'attachment; filename="repayments.pdf"',
+  );
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  assert.equal(new TextDecoder().decode(bytes.slice(0, 4)), "%PDF");
 });

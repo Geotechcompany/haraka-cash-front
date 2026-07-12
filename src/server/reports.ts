@@ -8,7 +8,7 @@ import { requireAdmin } from "@/server/auth";
 export type AdminReportType = "disbursements" | "repayments" | "fees";
 export type AdminReportFormat = "csv" | "pdf";
 
-type ReportRow = {
+export type ReportRow = {
   reference: string;
   applicationNumber: string;
   phone: string;
@@ -58,8 +58,25 @@ export async function createAdminReportResponse({
   const config = REPORT_CONFIG[report];
   const rows = await loadReportRows(config.paymentKind);
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `${config.filename}-${date}.${format}`;
+  return createReportFileResponse({
+    title: config.title,
+    filename: `${config.filename}-${date}.${format}`,
+    format,
+    rows,
+  });
+}
 
+export async function createReportFileResponse({
+  title,
+  filename,
+  format,
+  rows,
+}: {
+  title: string;
+  filename: string;
+  format: AdminReportFormat;
+  rows: ReportRow[];
+}) {
   if (format === "csv") {
     return new Response(toCsv(rows), {
       headers: {
@@ -70,7 +87,7 @@ export async function createAdminReportResponse({
     });
   }
 
-  const pdf = await toPdf(config.title, rows);
+  const pdf = await toPdf(title, rows);
   const pdfBody = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
   return new Response(pdfBody, {
     headers: {

@@ -6,6 +6,7 @@ const DB_NAME = process.env.MONGODB_DB ?? "harakacash";
 
 declare global {
   var __mongoClient: MongoClient | undefined;
+  var __mongoIndexes: Promise<void> | undefined;
 }
 
 export async function getDb(): Promise<Db> {
@@ -19,12 +20,13 @@ export async function getDb(): Promise<Db> {
     await globalThis.__mongoClient.connect();
   }
 
-  return globalThis.__mongoClient.db(DB_NAME);
+  const db = globalThis.__mongoClient.db(DB_NAME);
+  globalThis.__mongoIndexes ??= createIndexes(db);
+  await globalThis.__mongoIndexes;
+  return db;
 }
 
-export async function ensureIndexes() {
-  const db = await getDb();
-
+async function createIndexes(db: Db) {
   await Promise.all([
     db.collection("applications").createIndex({ applicationNumber: 1 }, { unique: true }),
     db.collection("applications").createIndex({ clerkUserId: 1, createdAt: -1 }),
@@ -54,4 +56,8 @@ export async function ensureIndexes() {
     db.collection("support_tickets").createIndex({ updatedAt: -1 }),
     db.collection("support_tickets").createIndex({ status: 1, clerkUserId: 1 }),
   ]);
+}
+
+export async function ensureIndexes() {
+  await getDb();
 }
