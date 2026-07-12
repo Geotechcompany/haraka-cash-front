@@ -26,10 +26,9 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" }).handl
 
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
-  await db.collection("notifications").updateMany(
-    { clerkUserId: userId, unread: true },
-    { $set: { unread: false } },
-  );
+  await db
+    .collection("notifications")
+    .updateMany({ clerkUserId: userId, unread: true }, { $set: { unread: false } });
 
   return { ok: true };
 });

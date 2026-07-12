@@ -2,8 +2,10 @@ import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 
 import type { LoanHistoryPoint } from "@/lib/models/analytics";
+import { requireAdmin } from "@/server/auth";
 
 export const getMonthlyLoanVolume = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
   const { buildMonthlyLoanVolume } = await import("@/server/internal/monthly-loan-volume");
   return buildMonthlyLoanVolume();
 });
@@ -47,27 +49,55 @@ export const getDashboardStats = createServerFn({ method: "GET" }).handler(async
 });
 
 export const getPortfolioMetrics = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
-  const applications = await db.collection("applications").find({}).toArray();
-  const users = await db.collection("users").find({}).toArray();
-
-  const borrowers = new Set(applications.map((a) => a.clerkUserId).filter(Boolean));
-  const repeatBorrowers = [...borrowers].filter((id) => {
-    return applications.filter((a) => a.clerkUserId === id).length > 1;
-  }).length;
-
-  const repeatRate = borrowers.size ? Math.round((repeatBorrowers / borrowers.size) * 100) : 0;
-  const defaultRate = applications.length
-    ? Math.round((applications.filter((a) => a.status === "Declined").length / applications.length) * 1000) / 10
+  const { buildMonthlyLoanVolume } = await import("@/server/internal/monthly-loan-volume");
+  const [activeUsers, borrowerRows, applicationRows, monthlyVolume] = await Promise.all([
+    db.collection("users").countDocuments({ status: { $ne: "Suspended" } }),
+    db
+      .collection("applications")
+      .aggregate<{ borrowers: number; repeatBorrowers: number }>([
+        { $match: { clerkUserId: { $type: "string" } } },
+        { $group: { _id: "$clerkUserId", applicationCount: { $sum: 1 } } },
+        {
+          $group: {
+            _id: null,
+            borrowers: { $sum: 1 },
+            repeatBorrowers: {
+              $sum: { $cond: [{ $gt: ["$applicationCount", 1] }, 1, 0] },
+            },
+          },
+        },
+      ])
+      .toArray(),
+    db
+      .collection("applications")
+      .aggregate<{ total: number; declined: number }>([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            declined: { $sum: { $cond: [{ $eq: ["$status", "Declined"] }, 1, 0] } },
+          },
+        },
+      ])
+      .toArray(),
+    buildMonthlyLoanVolume(),
+  ]);
+  const borrowers = borrowerRows[0]?.borrowers ?? 0;
+  const repeatBorrowers = borrowerRows[0]?.repeatBorrowers ?? 0;
+  const totalApplications = applicationRows[0]?.total ?? 0;
+  const declinedApplications = applicationRows[0]?.declined ?? 0;
+  const repeatRate = borrowers ? Math.round((repeatBorrowers / borrowers) * 100) : 0;
+  const defaultRate = totalApplications
+    ? Math.round((declinedApplications / totalApplications) * 1000) / 10
     : 0;
 
-  const { buildMonthlyLoanVolume } = await import("@/server/internal/monthly-loan-volume");
-
   return {
-    activeUsers: users.length,
+    activeUsers,
     repeatRate,
     defaultRate,
-    monthlyVolume: await buildMonthlyLoanVolume(),
+    monthlyVolume,
   };
 });

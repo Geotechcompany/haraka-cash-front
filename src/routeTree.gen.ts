@@ -37,6 +37,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as ApiWebhooksSmplyPayRouteImport } from './routes/api/webhooks/smply-pay'
+import { Route as ApiAdminReportsReportFormatRouteImport } from './routes/api/admin/reports/$report/$format'
 
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
@@ -178,6 +179,12 @@ const ApiWebhooksSmplyPayRoute = ApiWebhooksSmplyPayRouteImport.update({
   path: '/api/webhooks/smply-pay',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminReportsReportFormatRoute =
+  ApiAdminReportsReportFormatRouteImport.update({
+    id: '/api/admin/reports/$report/$format',
+    path: '/api/admin/reports/$report/$format',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
+  '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -237,6 +245,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
+  '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -268,6 +277,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
+  '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/'
     | '/api/webhooks/smply-pay'
+    | '/api/admin/reports/$report/$format'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin'
     | '/api/webhooks/smply-pay'
+    | '/api/admin/reports/$report/$format'
   id:
     | '__root__'
     | '/'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/'
     | '/api/webhooks/smply-pay'
+    | '/api/admin/reports/$report/$format'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -380,6 +393,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRoute
   ApiWebhooksSmplyPayRoute: typeof ApiWebhooksSmplyPayRoute
+  ApiAdminReportsReportFormatRoute: typeof ApiAdminReportsReportFormatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -580,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksSmplyPayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/reports/$report/$format': {
+      id: '/api/admin/reports/$report/$format'
+      path: '/api/admin/reports/$report/$format'
+      fullPath: '/api/admin/reports/$report/$format'
+      preLoaderRoute: typeof ApiAdminReportsReportFormatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -630,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRoute,
   ApiWebhooksSmplyPayRoute: ApiWebhooksSmplyPayRoute,
+  ApiAdminReportsReportFormatRoute: ApiAdminReportsReportFormatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

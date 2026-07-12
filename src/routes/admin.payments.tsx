@@ -69,12 +69,33 @@ function AdminPaymentsPage() {
   };
 
   return (
-    <AdminShell title="Payments" subtitle="M-Pesa collections, wallet balance, and admin withdrawals.">
+    <AdminShell
+      title="Payments"
+      subtitle="M-Pesa collections, wallet balance, and admin withdrawals."
+    >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Wallet balance" value={kes(wallet.balance)} icon={Wallet} tone="primary" />
-        <StatCard label="Fees collected" value={kes(feesToday)} icon={CreditCard} tone="success" delay={0.05} />
-        <StatCard label="Withdrawn" value={kes(withdrawalsToday)} icon={TrendingUp} tone="warning" delay={0.1} />
-        <StatCard label="Transactions" value={String(payments.length)} icon={ArrowDownToLine} tone="default" delay={0.15} />
+        <StatCard
+          label="Fees collected"
+          value={kes(feesToday)}
+          icon={CreditCard}
+          tone="success"
+          delay={0.05}
+        />
+        <StatCard
+          label="Withdrawn"
+          value={kes(withdrawalsToday)}
+          icon={TrendingUp}
+          tone="warning"
+          delay={0.1}
+        />
+        <StatCard
+          label="Transactions"
+          value={String(payments.length)}
+          icon={ArrowDownToLine}
+          tone="default"
+          delay={0.15}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
@@ -135,17 +156,26 @@ function AdminPaymentsPage() {
                   <td className="px-6 py-4">{p.applicant ?? p.phone}</td>
                   <td className="px-6 py-4 capitalize">{p.kind.replace("_", " ")}</td>
                   <td className="px-6 py-4">
-                    <span className={cn("inline-block text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize", statusStyles[p.status])}>
+                    <span
+                      className={cn(
+                        "inline-block text-[10px] font-medium px-2 py-0.5 rounded-full border capitalize",
+                        statusStyles[p.status],
+                      )}
+                    >
                       {p.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right tabular-nums font-semibold">{kes(p.amount)}</td>
+                  <td className="px-6 py-4 text-right tabular-nums font-semibold">
+                    {kes(p.amount)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {payments.length === 0 && (
-            <p className="p-8 text-center text-sm text-muted-foreground">No payment transactions yet.</p>
+            <p className="p-8 text-center text-sm text-muted-foreground">
+              No payment transactions yet.
+            </p>
           )}
         </div>
       </div>

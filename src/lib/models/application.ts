@@ -1,9 +1,5 @@
 export type ApplicationStatus =
-  | "Pending"
-  | "Approved"
-  | "Declined"
-  | "Completed"
-  | "Disbursing";
+  "Pending" | "Approved" | "Declined" | "Completed" | "Disbursing" | "DocumentsRequired";
 
 export type ApplicationRecord = {
   _id?: string;
@@ -20,6 +16,10 @@ export type ApplicationRecord = {
   eligibilityScore: number;
   riskScore: number;
   status: ApplicationStatus;
+  requiredDocuments?: string[];
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  reviewNotes?: string;
   quote?: {
     amount: number;
     months: number;
@@ -45,6 +45,10 @@ export type Application = {
   eligibilityScore: number;
   riskScore: number;
   status: ApplicationStatus;
+  requiredDocuments: string[];
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
   createdAt: string;
 };
 
@@ -62,10 +66,15 @@ export function toApplication(doc: ApplicationRecord): Application {
     eligibilityScore: doc.eligibilityScore,
     riskScore: doc.riskScore,
     status: doc.status,
-    createdAt:
-      doc.createdAt instanceof Date
-        ? doc.createdAt.toISOString()
-        : String(doc.createdAt),
+    requiredDocuments: doc.requiredDocuments ?? [],
+    reviewedBy: doc.reviewedBy,
+    reviewedAt: doc.reviewedAt
+      ? doc.reviewedAt instanceof Date
+        ? doc.reviewedAt.toISOString()
+        : String(doc.reviewedAt)
+      : undefined,
+    reviewNotes: doc.reviewNotes,
+    createdAt: doc.createdAt instanceof Date ? doc.createdAt.toISOString() : String(doc.createdAt),
   };
 }
 

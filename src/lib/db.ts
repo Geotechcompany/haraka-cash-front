@@ -28,8 +28,20 @@ export async function ensureIndexes() {
   await Promise.all([
     db.collection("applications").createIndex({ applicationNumber: 1 }, { unique: true }),
     db.collection("applications").createIndex({ clerkUserId: 1, createdAt: -1 }),
-    db.collection("applications").createIndex({ status: 1 }),
+    db.collection("applications").createIndex({ status: 1, updatedAt: -1 }),
     db.collection("users").createIndex({ clerkId: 1 }, { unique: true }),
+    db.collection("users").createIndex({ status: 1 }),
+    db.collection("users").createIndex({ email: 1 }, { unique: true, sparse: true }),
+    db.collection("loans").createIndex({ loanNumber: 1 }, { unique: true }),
+    db.collection("loans").createIndex({ applicationNumber: 1 }, { unique: true }),
+    db.collection("loans").createIndex({ clerkUserId: 1, createdAt: -1 }),
+    db.collection("loans").createIndex({ status: 1, dueDate: 1 }),
+    db
+      .collection("repayments")
+      .createIndex({ loanNumber: 1, installmentNumber: 1 }, { unique: true }),
+    db.collection("repayments").createIndex({ clerkUserId: 1, dueDate: 1 }),
+    db.collection("repayments").createIndex({ status: 1, dueDate: 1 }),
+    db.collection("settings").createIndex({ key: 1 }, { unique: true }),
     db.collection("notifications").createIndex({ clerkUserId: 1, createdAt: -1 }),
     db.collection("loan_history").createIndex({ clerkUserId: 1 }, { unique: true }),
     db.collection("analytics").createIndex({ key: 1 }, { unique: true }),
@@ -40,5 +52,6 @@ export async function ensureIndexes() {
     db.collection("audit_logs").createIndex({ createdAt: -1 }),
     db.collection("support_tickets").createIndex({ ticketNumber: 1 }, { unique: true }),
     db.collection("support_tickets").createIndex({ updatedAt: -1 }),
+    db.collection("support_tickets").createIndex({ status: 1, clerkUserId: 1 }),
   ]);
 }

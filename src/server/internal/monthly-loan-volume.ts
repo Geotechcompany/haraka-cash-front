@@ -3,14 +3,29 @@ import "@/lib/server-only";
 import type { ApplicationRecord } from "@/lib/models/application";
 import type { MonthlyLoanVolume } from "@/lib/models/analytics";
 
-const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthNames = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 export async function buildMonthlyLoanVolume(): Promise<MonthlyLoanVolume[]> {
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
-  const stored = await db.collection<{ key: string; data: MonthlyLoanVolume[] }>("analytics").findOne({
-    key: "monthly_loan_volume",
-  });
+  const stored = await db
+    .collection<{ key: string; data: MonthlyLoanVolume[] }>("analytics")
+    .findOne({
+      key: "monthly_loan_volume",
+    });
   if (stored?.data?.length) return stored.data;
 
   const applications = await db.collection<ApplicationRecord>("applications").find({}).toArray();

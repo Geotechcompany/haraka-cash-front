@@ -8,6 +8,9 @@ import { nitro } from "nitro/vite";
 const isNetlify = process.env.NETLIFY === "true";
 
 export default defineConfig({
+  server: {
+    allowedHosts: [".ngrok-free.app"],
+  },
   ssr: {
     external: ["mongodb", "bson"],
     noExternal: ["@clerk/tanstack-react-start", "@clerk/react", "@clerk/shared"],

@@ -1,58 +1,104 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import type { ApplicationRecord } from "@/lib/models/application";
-import type { PaymentRecord } from "@/lib/models/payment";
 import { kes } from "@/lib/loan";
+import { requireAdmin } from "@/server/auth";
 
-export const getAdminOverviewStats = createServerFn({ method: "GET" }).handler(async () => {  const { getDb } = await import("@/lib/db");
+export const getAdminOverviewStats = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
+  const { getDb } = await import("@/lib/db");
   const db = await getDb();
-  const [applications, payments, users] = await Promise.all([
-    db.collection<ApplicationRecord>("applications").find({}).toArray(),
-    db.collection<PaymentRecord>("payments").find({ status: "success" }).toArray(),
-    db.collection("users").find({}).toArray(),
-  ]);
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const applicationsToday = applications.filter((app) => {
-    const created = app.createdAt instanceof Date ? app.createdAt : new Date(app.createdAt);
-    return created >= today;
-  });
+  const [applicationRows, feeRows, loanRows, activeBorrowers] = await Promise.all([
+    db
+      .collection("applications")
+      .aggregate<{
+        total: number;
+        today: number;
+        approved: number;
+        declined: number;
+        pending: number;
+        totalAmount: number;
+      }>([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            today: { $sum: { $cond: [{ $gte: ["$createdAt", today] }, 1, 0] } },
+            approved: {
+              $sum: { $cond: [{ $in: ["$status", ["Approved", "Disbursing"]] }, 1, 0] },
+            },
+            declined: { $sum: { $cond: [{ $eq: ["$status", "Declined"] }, 1, 0] } },
+            pending: {
+              $sum: {
+                $cond: [{ $in: ["$status", ["Pending", "DocumentsRequired"]] }, 1, 0],
+              },
+            },
+            totalAmount: { $sum: "$amount" },
+          },
+        },
+      ])
+      .toArray(),
+    db
+      .collection("payments")
+      .aggregate<{ total: number }>([
+        {
+          $match: {
+            status: "success",
+            kind: "processing_fee",
+            createdAt: { $gte: today },
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ])
+      .toArray(),
+    db
+      .collection("loans")
+      .aggregate<{ total: number }>([
+        { $match: { status: { $in: ["Disbursing", "Active", "Overdue"] } } },
+        { $group: { _id: null, total: { $sum: "$outstandingBalance" } } },
+      ])
+      .toArray(),
+    db.collection("users").countDocuments({ status: { $ne: "Suspended" } }),
+  ]);
 
-  const approved = applications.filter((a) => a.status === "Approved" || a.status === "Disbursing").length;
-  const declined = applications.filter((a) => a.status === "Declined").length;
-  const approvalRate = applications.length
-    ? Math.round((approved / applications.length) * 100)
-    : 0;
-
-  const feesToday = payments
-    .filter((p) => p.kind === "processing_fee" && p.createdAt >= today)
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const outstanding = applications
-    .filter((a) => a.status === "Approved" || a.status === "Disbursing")
-    .reduce((sum, a) => sum + a.amount, 0);
-
-  const avgTicket = applications.length
-    ? Math.round(applications.reduce((sum, a) => sum + a.amount, 0) / applications.length)
+  const applications = applicationRows[0] ?? {
+    total: 0,
+    today: 0,
+    approved: 0,
+    declined: 0,
+    pending: 0,
+    totalAmount: 0,
+  };
+  const approved = applications.approved;
+  const declined = applications.declined;
+  const approvalRate = applications.total ? Math.round((approved / applications.total) * 100) : 0;
+  const feesToday = feeRows[0]?.total ?? 0;
+  const outstanding = loanRows[0]?.total ?? 0;
+  const avgTicket = applications.total
+    ? Math.round(applications.totalAmount / applications.total)
     : 0;
 
   const approvalMix = [
     { name: "Approved", value: approved, color: "var(--color-chart-3)" },
-    { name: "Pending", value: applications.filter((a) => a.status === "Pending").length, color: "var(--color-chart-4)" },
+    {
+      name: "Pending",
+      value: applications.pending,
+      color: "var(--color-chart-4)",
+    },
     { name: "Declined", value: declined, color: "var(--color-chart-5)" },
   ].filter((item) => item.value > 0);
 
   return {
-    applicationsToday: applicationsToday.length,
+    applicationsToday: applications.today,
     approved,
     declined,
     approvalRate,
     feesToday,
     outstanding,
     avgTicket,
-    activeBorrowers: users.length,
+    activeBorrowers,
     approvalMix,
     feesTodayFormatted: kes(feesToday),
     outstandingFormatted: kes(outstanding),

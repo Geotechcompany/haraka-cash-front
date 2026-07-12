@@ -43,10 +43,7 @@ export function toPayment(doc: PaymentRecord, applicant?: string): Payment {
     applicant,
     applicationNumber: doc.applicationNumber,
     description: doc.description,
-    createdAt:
-      doc.createdAt instanceof Date
-        ? doc.createdAt.toISOString()
-        : String(doc.createdAt),
+    createdAt: doc.createdAt instanceof Date ? doc.createdAt.toISOString() : String(doc.createdAt),
   };
 }
 

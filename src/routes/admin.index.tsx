@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { FileText, CheckCircle2, XCircle, TrendingUp, Users, Wallet } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { StatCard } from "@/components/ui-extras/stat-card";
 import { kes } from "@/lib/loan";
@@ -34,13 +46,57 @@ function AdminDashboard() {
   return (
     <AdminShell title="Overview" subtitle="Snapshot of applications, disbursements and fees today.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Applications today" value={String(stats.applicationsToday)} icon={FileText} tone="primary" />
-        <StatCard label="Approved" value={String(stats.approved)} hint={`${stats.approvalRate}% approval rate`} icon={CheckCircle2} tone="success" delay={0.05} />
-        <StatCard label="Declined" value={String(stats.declined)} icon={XCircle} tone="danger" delay={0.1} />
-        <StatCard label="Fees collected" value={stats.feesTodayFormatted} hint="Today" icon={Wallet} tone="warning" delay={0.15} />
-        <StatCard label="Total loans" value={stats.outstandingFormatted} hint="Outstanding" icon={TrendingUp} tone="primary" delay={0.2} />
-        <StatCard label="Active borrowers" value={String(stats.activeBorrowers)} icon={Users} tone="default" delay={0.3} />
-        <StatCard label="Avg. ticket" value={stats.avgTicketFormatted} icon={TrendingUp} tone="default" delay={0.35} />
+        <StatCard
+          label="Applications today"
+          value={String(stats.applicationsToday)}
+          icon={FileText}
+          tone="primary"
+        />
+        <StatCard
+          label="Approved"
+          value={String(stats.approved)}
+          hint={`${stats.approvalRate}% approval rate`}
+          icon={CheckCircle2}
+          tone="success"
+          delay={0.05}
+        />
+        <StatCard
+          label="Declined"
+          value={String(stats.declined)}
+          icon={XCircle}
+          tone="danger"
+          delay={0.1}
+        />
+        <StatCard
+          label="Fees collected"
+          value={stats.feesTodayFormatted}
+          hint="Today"
+          icon={Wallet}
+          tone="warning"
+          delay={0.15}
+        />
+        <StatCard
+          label="Total loans"
+          value={stats.outstandingFormatted}
+          hint="Outstanding"
+          icon={TrendingUp}
+          tone="primary"
+          delay={0.2}
+        />
+        <StatCard
+          label="Active borrowers"
+          value={String(stats.activeBorrowers)}
+          icon={Users}
+          tone="default"
+          delay={0.3}
+        />
+        <StatCard
+          label="Avg. ticket"
+          value={stats.avgTicketFormatted}
+          icon={TrendingUp}
+          tone="default"
+          delay={0.35}
+        />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -64,12 +120,26 @@ function AdminDashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs" />
                   <YAxis tickLine={false} axisLine={false} className="text-xs" />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--color-border)", background: "var(--color-card)" }} />
-                  <Area type="monotone" dataKey="volume" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#ga)" />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-card)",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="volume"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2.5}
+                    fill="url(#ga)"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full grid place-items-center text-sm text-muted-foreground">No loan volume data yet</div>
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                No loan volume data yet
+              </div>
             )}
           </div>
         </div>
@@ -81,14 +151,25 @@ function AdminDashboard() {
             {stats.approvalMix.length > 0 ? (
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={stats.approvalMix} innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value" stroke="none">
-                    {stats.approvalMix.map((s, i) => <Cell key={i} fill={s.color} />)}
+                  <Pie
+                    data={stats.approvalMix}
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {stats.approvalMix.map((s, i) => (
+                      <Cell key={i} fill={s.color} />
+                    ))}
                   </Pie>
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full grid place-items-center text-sm text-muted-foreground">No applications yet</div>
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                No applications yet
+              </div>
             )}
           </div>
         </div>
@@ -114,10 +195,17 @@ function AdminDashboard() {
             </thead>
             <tbody className="divide-y">
               {recent.map((a, i) => (
-                <motion.tr key={a.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
+                <motion.tr
+                  key={a.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.03 }}
+                >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full gradient-brand text-white grid place-items-center text-xs font-semibold shrink-0">{a.applicant[0]}</div>
+                      <div className="h-8 w-8 rounded-full gradient-brand text-white grid place-items-center text-xs font-semibold shrink-0">
+                        {a.applicant[0]}
+                      </div>
                       <div className="min-w-0">
                         <p className="font-medium truncate">{a.applicant}</p>
                         <p className="text-xs text-muted-foreground truncate">{a.id}</p>
@@ -125,14 +213,29 @@ function AdminDashboard() {
                     </div>
                   </td>
                   <td className="px-6 py-4 tabular-nums font-semibold">{kes(a.amount)}</td>
-                  <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">{a.employer}</td>
-                  <td className="px-6 py-4 hidden lg:table-cell tabular-nums">{a.eligibilityScore}</td>
-                  <td className="px-6 py-4"><span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", statusStyles[a.status])}>{a.status}</span></td>
+                  <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
+                    {a.employer}
+                  </td>
+                  <td className="px-6 py-4 hidden lg:table-cell tabular-nums">
+                    {a.eligibilityScore}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={cn(
+                        "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                        statusStyles[a.status],
+                      )}
+                    >
+                      {a.status}
+                    </span>
+                  </td>
                 </motion.tr>
               ))}
               {recent.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">No applications yet</td>
+                  <td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">
+                    No applications yet
+                  </td>
                 </tr>
               )}
             </tbody>

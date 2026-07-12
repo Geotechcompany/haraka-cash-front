@@ -9,12 +9,9 @@ import {
   type ApplicationStatus,
 } from "@/lib/models/application";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
-
-async function requireUserId() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
+import { processingFee } from "@/lib/loan";
+import { applicationStatusForReview } from "@/lib/admin-domain";
+import { requireAdmin, requireUserId } from "@/server/auth";
 
 async function ensureUser(clerkId: string) {
   const { getDb } = await import("@/lib/db");
@@ -58,13 +55,14 @@ const listApplicationsInput = z
 export const listApplications = createServerFn({ method: "GET" })
   .validator((data: unknown) => listApplicationsInput.parse(data))
   .handler(async ({ data }) => {
+    const scope = data?.scope ?? "mine";
+    if (scope === "all") {
+      await requireAdmin();
+    }
+
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
-    const scope = data?.scope ?? "mine";
-    const filter =
-      scope === "all"
-        ? {}
-        : { clerkUserId: (await auth()).userId ?? "__none__" };
+    const filter = scope === "all" ? {} : { clerkUserId: (await auth()).userId ?? "__none__" };
 
     const docs = await db
       .collection<ApplicationRecord>("applications")
@@ -78,12 +76,26 @@ export const listApplications = createServerFn({ method: "GET" })
 export const getApplication = createServerFn({ method: "GET" })
   .validator((id: string) => z.string().min(1).parse(id))
   .handler(async ({ data: applicationNumber }) => {
+    const clerkUserId = await requireUserId();
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const doc = await db
+      .collection<ApplicationRecord>("applications")
+      .findOne({ applicationNumber, clerkUserId });
+
+    if (!doc) return null;
+    return { ...toApplication(doc), quote: doc.quote ?? null };
+  });
+
+export const getAdminApplication = createServerFn({ method: "GET" })
+  .validator((id: string) => z.string().min(1).parse(id))
+  .handler(async ({ data: applicationNumber }) => {
+    await requireAdmin();
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const doc = await db
       .collection<ApplicationRecord>("applications")
       .findOne({ applicationNumber });
-
     if (!doc) return null;
     return { ...toApplication(doc), quote: doc.quote ?? null };
   });
@@ -110,12 +122,31 @@ export const createApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const clerkUserId = await requireUserId();
     const user = await ensureUser(clerkUserId);
+    const { readPlatformSettings } = await import("@/server/settings");
+    const lendingSettings = await readPlatformSettings();
+    if (lendingSettings.maintenanceMode) {
+      throw new Error("New applications are temporarily unavailable");
+    }
+    if (
+      data.amount < lendingSettings.minLoanAmount ||
+      data.amount > lendingSettings.maxLoanAmount
+    ) {
+      throw new Error(
+        `Loan amount must be between KES ${lendingSettings.minLoanAmount.toLocaleString()} and KES ${lendingSettings.maxLoanAmount.toLocaleString()}`,
+      );
+    }
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const now = new Date();
     const count = await db.collection("applications").countDocuments();
     const applicationNumber = nextApplicationNumber(count);
-    const applicant = [user.firstName, user.lastName].filter(Boolean).join(" ") || "HarakaCash user";
+    const applicant =
+      [user.firstName, user.lastName].filter(Boolean).join(" ") || "HarakaCash user";
+    const fee = processingFee(data.amount);
+    const interest = Math.round(
+      data.amount * (lendingSettings.monthlyInterestRate / 100) * data.months,
+    );
+    const totalPayable = data.amount + interest + fee;
 
     const doc: ApplicationRecord = {
       applicationNumber,
@@ -131,7 +162,14 @@ export const createApplication = createServerFn({ method: "POST" })
       eligibilityScore: user.eligibilityScore,
       riskScore: 100 - user.eligibilityScore,
       status: "Pending",
-      quote: data.quote,
+      quote: {
+        amount: data.amount,
+        months: data.months,
+        fee,
+        interest,
+        totalPayable,
+        monthly: Math.round(totalPayable / data.months),
+      },
       createdAt: now,
       updatedAt: now,
     };
@@ -168,7 +206,10 @@ export const runAssessment = createServerFn({ method: "POST" })
 
     if (!doc) throw new Error("Application not found");
 
-    const approved = doc.amount <= 100000;
+    const { readPlatformSettings } = await import("@/server/settings");
+    const lendingSettings = await readPlatformSettings();
+    const approved =
+      lendingSettings.automatedApprovals && doc.amount <= lendingSettings.maxLoanAmount;
     const status: ApplicationStatus = approved ? "Approved" : "Declined";
     const eligibilityScore = approved
       ? Math.min(95, doc.eligibilityScore + 8)
@@ -208,19 +249,113 @@ export const runAssessment = createServerFn({ method: "POST" })
 
 const updateStatusInput = z.object({
   applicationNumber: z.string(),
-  status: z.enum(["Pending", "Approved", "Declined", "Completed", "Disbursing"]),
+  status: z.enum([
+    "Pending",
+    "Approved",
+    "Declined",
+    "Completed",
+    "Disbursing",
+    "DocumentsRequired",
+  ]),
 });
+
+const reviewApplicationInput = z.object({
+  applicationNumber: z.string().min(1),
+  action: z.enum(["approve", "decline", "requestDocuments"]),
+  note: z.string().trim().max(500).optional(),
+  requiredDocuments: z.array(z.string().trim().min(1).max(100)).max(10).optional(),
+});
+
+export const reviewApplication = createServerFn({ method: "POST" })
+  .validator((input: unknown) => reviewApplicationInput.parse(input))
+  .handler(async ({ data }) => {
+    const adminId = await requireAdmin();
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const application = await db
+      .collection<ApplicationRecord>("applications")
+      .findOne({ applicationNumber: data.applicationNumber });
+    if (!application) throw new Error("Application not found");
+
+    const status = applicationStatusForReview(data.action);
+    const now = new Date();
+    const requiredDocuments =
+      data.action === "requestDocuments"
+        ? data.requiredDocuments?.length
+          ? data.requiredDocuments
+          : ["National ID", "Proof of income"]
+        : [];
+
+    await db.collection<ApplicationRecord>("applications").updateOne(
+      { applicationNumber: data.applicationNumber },
+      {
+        $set: {
+          status,
+          reviewedBy: adminId,
+          reviewedAt: now,
+          reviewNotes: data.note,
+          requiredDocuments,
+          updatedAt: now,
+        },
+      },
+    );
+
+    if (application.clerkUserId) {
+      const notification =
+        status === "Approved"
+          ? {
+              title: "Loan application approved",
+              body: `Your application ${data.applicationNumber} has been approved.`,
+              type: "success",
+            }
+          : status === "Declined"
+            ? {
+                title: "Loan application declined",
+                body:
+                  data.note ||
+                  `Your application ${data.applicationNumber} was not approved at this time.`,
+                type: "warning",
+              }
+            : {
+                title: "Documents required",
+                body: `Please provide: ${requiredDocuments.join(", ")}.${data.note ? ` ${data.note}` : ""}`,
+                type: "info",
+              };
+      await db.collection("notifications").insertOne({
+        clerkUserId: application.clerkUserId,
+        ...notification,
+        unread: true,
+        createdAt: now,
+      });
+    }
+
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
+    await logAuditEvent({
+      actor: adminId,
+      action:
+        status === "Approved"
+          ? "Approved application"
+          : status === "Declined"
+            ? "Declined application"
+            : "Requested application documents",
+      target: data.applicationNumber,
+    });
+
+    return { ok: true, status };
+  });
 
 export const updateApplicationStatus = createServerFn({ method: "POST" })
   .validator((data: unknown) => updateStatusInput.parse(data))
   .handler(async ({ data }) => {
-    await requireUserId();
+    await requireAdmin();
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
-    await db.collection<ApplicationRecord>("applications").updateOne(
-      { applicationNumber: data.applicationNumber },
-      { $set: { status: data.status, updatedAt: new Date() } },
-    );
+    await db
+      .collection<ApplicationRecord>("applications")
+      .updateOne(
+        { applicationNumber: data.applicationNumber },
+        { $set: { status: data.status, updatedAt: new Date() } },
+      );
     const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: "admin",
