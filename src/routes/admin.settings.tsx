@@ -19,10 +19,18 @@ function AdminSettingsPage() {
   const initialSettings = Route.useLoaderData();
   const updateSettings = useServerFn(updateAdminPlatformSettings);
   const [settings, setSettings] = useState(initialSettings);
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState(
+    initialSettings.geminiApiKeyMasked || "",
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const setNumber = (
-    key: "minLoanAmount" | "maxLoanAmount" | "monthlyInterestRate" | "lateFeeRate",
+    key:
+      | "minLoanAmount"
+      | "maxLoanAmount"
+      | "minProcessingFee"
+      | "monthlyInterestRate"
+      | "lateFeeRate",
     value: string,
   ) => {
     setSettings((current) => ({ ...current, [key]: Number(value) }));
@@ -38,19 +46,23 @@ function AdminSettingsPage() {
   const save = async () => {
     setIsSaving(true);
     try {
+      const keyChanged = geminiApiKeyInput !== (settings.geminiApiKeyMasked || "");
       const updated = await updateSettings({
         data: {
           minLoanAmount: settings.minLoanAmount,
           maxLoanAmount: settings.maxLoanAmount,
+          minProcessingFee: settings.minProcessingFee,
           monthlyInterestRate: settings.monthlyInterestRate,
           lateFeeRate: settings.lateFeeRate,
           automatedApprovals: settings.automatedApprovals,
           fraudChecks: settings.fraudChecks,
           smsNotifications: settings.smsNotifications,
           maintenanceMode: settings.maintenanceMode,
+          ...(keyChanged ? { geminiApiKey: geminiApiKeyInput } : {}),
         },
       });
       setSettings(updated);
+      setGeminiApiKeyInput(updated.geminiApiKeyMasked || "");
       toast.success("Platform settings saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save settings");
@@ -87,17 +99,24 @@ function AdminSettingsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card-soft p-6">
           <p className="font-semibold">Lending policy</p>
-          <p className="text-xs text-muted-foreground">Adjust product-wide limits.</p>
+          <p className="text-xs text-muted-foreground">
+            Minimum loan amount and processing fee apply to every applicant.
+          </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field
-              label="Min amount (KES)"
+              label="Min loan amount (KES)"
               value={settings.minLoanAmount}
               onChange={(event) => setNumber("minLoanAmount", event.target.value)}
             />
             <Field
-              label="Max amount (KES)"
+              label="Max loan amount (KES)"
               value={settings.maxLoanAmount}
               onChange={(event) => setNumber("maxLoanAmount", event.target.value)}
+            />
+            <Field
+              label="Min processing fee (KES)"
+              value={settings.minProcessingFee}
+              onChange={(event) => setNumber("minProcessingFee", event.target.value)}
             />
             <Field
               label="Monthly interest %"
@@ -110,6 +129,30 @@ function AdminSettingsPage() {
               onChange={(event) => setNumber("lateFeeRate", event.target.value)}
             />
           </div>
+
+          <div className="mt-6 space-y-1.5">
+            <Label htmlFor="gemini-api-key">Gemini API key</Label>
+            <Input
+              id="gemini-api-key"
+              type="password"
+              autoComplete="off"
+              className="h-11 rounded-xl font-mono text-sm"
+              value={geminiApiKeyInput}
+              placeholder="Paste key, or leave blank to use env"
+              onChange={(event) => setGeminiApiKeyInput(event.target.value)}
+              onFocus={() => {
+                if (geminiApiKeyInput.startsWith("••••")) {
+                  setGeminiApiKeyInput("");
+                }
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              {settings.geminiApiKeyConfigured
+                ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
+                : "No admin key saved. Quote AI uses GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY if set."}
+            </p>
+          </div>
+
           <Button
             type="button"
             disabled={isSaving}

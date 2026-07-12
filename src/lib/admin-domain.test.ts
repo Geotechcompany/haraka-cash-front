@@ -97,7 +97,20 @@ test("platform settings mapper supplies defaults for legacy records", () => {
   });
   assert.equal(settings.minLoanAmount, 1_000);
   assert.equal(settings.maxLoanAmount, 75_000);
+  assert.equal(settings.minProcessingFee, 150);
   assert.equal(settings.monthlyInterestRate, 6);
+  assert.equal(settings.geminiApiKeyConfigured, false);
+  assert.equal(settings.geminiApiKeyMasked, "");
+});
+
+test("platform settings masks Gemini API key and never exposes raw value", () => {
+  const settings = toPlatformSettings({
+    key: "platform-lending",
+    geminiApiKey: "AIzaSySecretKeyValue1234",
+  });
+  assert.equal(settings.geminiApiKeyConfigured, true);
+  assert.equal(settings.geminiApiKeyMasked, "••••••••1234");
+  assert.equal("geminiApiKey" in settings, false);
 });
 
 test("CSV report response sets download headers and serializes rows", async () => {

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, Upload, Sparkles, CheckCircle2 } from "lucide-react";
@@ -16,9 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { kes, processingFee } from "@/lib/loan";
+import { buildLoanQuote, kes } from "@/lib/loan";
+import { kenyanNationalIdError, kenyanPhoneError } from "@/lib/kenya-format";
 import { cn } from "@/lib/utils";
 import { createApplication, getCurrentUser } from "@/server/applications";
+import { generateLoanQuote, type GeneratedLoanQuote } from "@/server/quote";
 import { getPublicLendingPolicy } from "@/server/settings";
 
 export const Route = createFileRoute("/apply")({
@@ -38,49 +40,184 @@ const steps = [
   { key: "documents", title: "Documents", desc: "Upload verification" },
 ] as const;
 
+type FormState = {
+  fullName: string;
+  nationalId: string;
+  phone: string;
+  mpesaNumber: string;
+  employmentStatus: string;
+  employer: string;
+  jobTitle: string;
+  yearsAtEmployer: string;
+  monthlyIncome: string;
+  monthlyExpenses: string;
+  existingLoans: string;
+  rentMortgage: string;
+  purpose: string;
+  additionalDetails: string;
+  idDocumentName: string;
+};
+
+type FieldErrors = Partial<Record<keyof FormState, string>>;
+
 function ApplyPage() {
   const { user, lendingPolicy } = Route.useLoaderData();
   const navigate = useNavigate();
   const createApplicationFn = useServerFn(createApplication);
+  const generateLoanQuoteFn = useServerFn(generateLoanQuote);
   const [step, setStep] = useState(0);
   const [amount, setAmount] = useState(
     Math.min(Math.max(10_000, lendingPolicy.minLoanAmount), lendingPolicy.maxLoanAmount),
   );
   const [months, setMonths] = useState(3);
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [quoteUpdating, setQuoteUpdating] = useState(false);
+  const [serverQuote, setServerQuote] = useState<GeneratedLoanQuote | null>(null);
 
-  const quote = useMemo(() => {
-    const fee = processingFee(amount);
-    const interest = Math.round(amount * (lendingPolicy.monthlyInterestRate / 100) * months);
-    const totalPayable = amount + fee + interest;
-    return {
-      amount,
-      months,
-      fee,
-      interest,
-      totalPayable,
-      monthly: Math.round(totalPayable / months),
+  const [form, setForm] = useState<FormState>({
+    fullName: user?.name ?? "",
+    nationalId: "",
+    phone: user?.phone ?? "",
+    mpesaNumber: user?.phone ?? "",
+    employmentStatus: "Employed",
+    employer: "",
+    jobTitle: "",
+    yearsAtEmployer: "",
+    monthlyIncome: "",
+    monthlyExpenses: "",
+    existingLoans: "",
+    rentMortgage: "",
+    purpose: "Business",
+    additionalDetails: "",
+    idDocumentName: "",
+  });
+
+  const localQuote = useMemo(
+    () =>
+      buildLoanQuote(amount, months, {
+        monthlyInterestRatePercent: lendingPolicy.monthlyInterestRate,
+        minProcessingFee: lendingPolicy.minProcessingFee,
+      }),
+    [amount, lendingPolicy.minProcessingFee, lendingPolicy.monthlyInterestRate, months],
+  );
+
+  /** Money always from local policy math; server may add notes / riskBand. */
+  const quote = {
+    ...localQuote,
+    notes: serverQuote?.notes,
+    riskBand: serverQuote?.riskBand,
+    source: serverQuote?.source ?? ("local" as const),
+  };
+
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const errors = useMemo(() => validateStep(step, form), [step, form]);
+  const stepValid = Object.keys(errors).length === 0;
+
+  useEffect(() => {
+    setAttempted(false);
+  }, [step]);
+
+  useEffect(() => {
+    const income = Number(form.monthlyIncome);
+    const expenses = Number(form.monthlyExpenses);
+    const loans = Number(form.existingLoans);
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setQuoteUpdating(true);
+      try {
+        const next = await generateLoanQuoteFn({
+          data: {
+            amount,
+            months,
+            monthlyIncome: Number.isFinite(income) ? income : undefined,
+            monthlyExpenses: Number.isFinite(expenses) ? expenses : undefined,
+            existingLoans: Number.isFinite(loans) ? loans : undefined,
+            employmentStatus: form.employmentStatus || undefined,
+            purpose: form.purpose || undefined,
+          },
+        });
+        if (!cancelled) setServerQuote(next);
+      } catch {
+        if (!cancelled) {
+          setServerQuote({
+            ...buildLoanQuote(amount, months, {
+              monthlyInterestRatePercent: lendingPolicy.monthlyInterestRate,
+              minProcessingFee: lendingPolicy.minProcessingFee,
+            }),
+            source: "local",
+          });
+        }
+      } finally {
+        if (!cancelled) setQuoteUpdating(false);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [amount, lendingPolicy.monthlyInterestRate, months]);
+  }, [
+    amount,
+    months,
+    form.monthlyIncome,
+    form.monthlyExpenses,
+    form.existingLoans,
+    form.employmentStatus,
+    form.purpose,
+    generateLoanQuoteFn,
+    lendingPolicy.monthlyInterestRate,
+    lendingPolicy.minProcessingFee,
+  ]);
 
-  const next = () => setStep((s) => (s < steps.length - 1 ? s + 1 : s));
+  const next = () => {
+    setAttempted(true);
+    if (!stepValid) return;
+    setStep((s) => (s < steps.length - 1 ? s + 1 : s));
+  };
+
   const back = () => setStep((s) => Math.max(0, s - 1));
 
   const submit = async () => {
+    setAttempted(true);
+    if (!stepValid) return;
     setSubmitting(true);
     try {
       const application = await createApplicationFn({
         data: {
           amount,
           months,
-          purpose: "Personal",
-          quote,
+          purpose: form.purpose,
+          employer: form.employer.trim(),
+          monthlyIncome: Number(form.monthlyIncome) || 0,
+          quote: {
+            amount: quote.amount,
+            months: quote.months,
+            fee: quote.fee,
+            interest: quote.interest,
+            totalPayable: quote.totalPayable,
+            monthly: quote.monthly,
+          },
         },
       });
       navigate({ to: "/assessment", search: { applicationId: application.id } });
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const showError = (key: keyof FormState) => {
+    const message = errors[key];
+    if (!message) return undefined;
+    if (attempted) return message;
+    const value = form[key];
+    if (value.trim() !== "" && (key === "phone" || key === "mpesaNumber" || key === "nationalId")) {
+      return message;
+    }
+    return undefined;
   };
 
   return (
@@ -93,7 +230,6 @@ function ApplyPage() {
           </p>
         </div>
 
-        {/* Stepper */}
         <ol className="hidden md:flex items-center gap-2 mb-8">
           {steps.map((s, i) => (
             <li key={s.key} className="flex items-center gap-2 flex-1">
@@ -160,19 +296,43 @@ function ApplyPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field
                       label="Full name"
+                      name="fullName"
                       placeholder="Your full name"
-                      defaultValue={user?.name ?? ""}
+                      value={form.fullName}
+                      onChange={(e) => setField("fullName", e.target.value)}
+                      required
+                      error={showError("fullName")}
                     />
-                    <Field label="National ID" placeholder="12345678" />
+                    <Field
+                      label="National ID"
+                      name="nationalId"
+                      placeholder="12345678"
+                      inputMode="numeric"
+                      value={form.nationalId}
+                      onChange={(e) => setField("nationalId", e.target.value)}
+                      required
+                      error={showError("nationalId")}
+                    />
                     <Field
                       label="Phone"
+                      name="phone"
                       placeholder="07xx xxx xxx"
-                      defaultValue={user?.phone ?? ""}
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={form.phone}
+                      onChange={(e) => setField("phone", e.target.value)}
+                      required
+                      error={showError("phone")}
                     />
                     <Field
                       label="M-Pesa number"
+                      name="mpesaNumber"
                       placeholder="07xx xxx xxx"
-                      defaultValue={user?.phone ?? ""}
+                      inputMode="tel"
+                      value={form.mpesaNumber}
+                      onChange={(e) => setField("mpesaNumber", e.target.value)}
+                      required
+                      error={showError("mpesaNumber")}
                     />
                   </div>
                 )}
@@ -180,10 +340,15 @@ function ApplyPage() {
                 {step === 1 && (
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label>Employment status</Label>
-                      <Select defaultValue="Employed">
-                        <SelectTrigger className="h-11 rounded-xl">
-                          <SelectValue />
+                      <Label htmlFor="employmentStatus">
+                        Employment status <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={form.employmentStatus}
+                        onValueChange={(v) => setField("employmentStatus", v)}
+                      >
+                        <SelectTrigger id="employmentStatus" className="h-11 rounded-xl">
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
                           {[
@@ -199,19 +364,89 @@ function ApplyPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {showError("employmentStatus") && (
+                        <p className="text-xs text-destructive">{showError("employmentStatus")}</p>
+                      )}
                     </div>
-                    <Field label="Employer" placeholder="Company name" />
-                    <Field label="Job title" placeholder="Your role" />
-                    <Field label="Years at employer" type="number" placeholder="0" />
+                    <Field
+                      label="Employer"
+                      name="employer"
+                      placeholder="Company name"
+                      value={form.employer}
+                      onChange={(e) => setField("employer", e.target.value)}
+                      required
+                      error={showError("employer")}
+                    />
+                    <Field
+                      label="Job title"
+                      name="jobTitle"
+                      placeholder="Your role"
+                      value={form.jobTitle}
+                      onChange={(e) => setField("jobTitle", e.target.value)}
+                      required
+                      error={showError("jobTitle")}
+                    />
+                    <Field
+                      label="Years at employer"
+                      name="yearsAtEmployer"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="0"
+                      value={form.yearsAtEmployer}
+                      onChange={(e) => setField("yearsAtEmployer", e.target.value)}
+                      required
+                      error={showError("yearsAtEmployer")}
+                    />
                   </div>
                 )}
 
                 {step === 2 && (
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Monthly income (KES)" type="number" placeholder="0" />
-                    <Field label="Monthly expenses (KES)" type="number" placeholder="0" />
-                    <Field label="Existing loans (KES)" type="number" placeholder="0" />
-                    <Field label="Rent / mortgage (KES)" type="number" placeholder="0" />
+                    <Field
+                      label="Monthly income (KES)"
+                      name="monthlyIncome"
+                      type="number"
+                      min={1}
+                      placeholder="0"
+                      value={form.monthlyIncome}
+                      onChange={(e) => setField("monthlyIncome", e.target.value)}
+                      required
+                      error={showError("monthlyIncome")}
+                    />
+                    <Field
+                      label="Monthly expenses (KES)"
+                      name="monthlyExpenses"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={form.monthlyExpenses}
+                      onChange={(e) => setField("monthlyExpenses", e.target.value)}
+                      required
+                      error={showError("monthlyExpenses")}
+                    />
+                    <Field
+                      label="Existing loans (KES)"
+                      name="existingLoans"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={form.existingLoans}
+                      onChange={(e) => setField("existingLoans", e.target.value)}
+                      required
+                      error={showError("existingLoans")}
+                    />
+                    <Field
+                      label="Rent / mortgage (KES)"
+                      name="rentMortgage"
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={form.rentMortgage}
+                      onChange={(e) => setField("rentMortgage", e.target.value)}
+                      required
+                      error={showError("rentMortgage")}
+                    />
                   </div>
                 )}
 
@@ -251,11 +486,13 @@ function ApplyPage() {
                         step={1}
                       />
                     </div>
-                    <div>
-                      <Label>Loan purpose</Label>
-                      <Select defaultValue="Business">
-                        <SelectTrigger className="h-11 rounded-xl mt-1.5">
-                          <SelectValue />
+                    <div className="space-y-1.5">
+                      <Label htmlFor="purpose">
+                        Loan purpose <span className="text-destructive">*</span>
+                      </Label>
+                      <Select value={form.purpose} onValueChange={(v) => setField("purpose", v)}>
+                        <SelectTrigger id="purpose" className="h-11 rounded-xl">
+                          <SelectValue placeholder="Select purpose" />
                         </SelectTrigger>
                         <SelectContent>
                           {[
@@ -272,13 +509,19 @@ function ApplyPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {showError("purpose") && (
+                        <p className="text-xs text-destructive">{showError("purpose")}</p>
+                      )}
                     </div>
                     <div>
-                      <Label>Additional details</Label>
+                      <Label htmlFor="additionalDetails">Additional details</Label>
                       <Textarea
+                        id="additionalDetails"
                         className="mt-1.5 rounded-xl"
                         rows={3}
                         placeholder="Optional context for our review team"
+                        value={form.additionalDetails}
+                        onChange={(e) => setField("additionalDetails", e.target.value)}
                       />
                     </div>
                   </div>
@@ -286,63 +529,108 @@ function ApplyPage() {
 
                 {step === 4 && (
                   <div className="grid gap-3">
-                    <button
-                      type="button"
-                      className="card-soft p-5 text-left hover:border-primary hover:shadow-elevated transition-all group"
+                    <label
+                      className={cn(
+                        "card-soft p-5 text-left hover:border-primary hover:shadow-elevated transition-all group cursor-pointer block",
+                        showError("idDocumentName") && "border-destructive",
+                      )}
                     >
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="sr-only"
+                        required
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setField("idDocumentName", file?.name ?? "");
+                        }}
+                      />
                       <div className="h-10 w-10 rounded-xl bg-primary-soft text-primary grid place-items-center group-hover:scale-105 transition-transform">
                         <Upload className="h-5 w-5" />
                       </div>
-                      <p className="mt-3 font-semibold">National ID</p>
+                      <p className="mt-3 font-semibold">
+                        National ID <span className="text-destructive">*</span>
+                      </p>
                       <p className="text-xs text-muted-foreground">Front & back photo</p>
-                      <p className="mt-2 text-xs text-primary font-medium">Click to upload</p>
-                    </button>
+                      <p className="mt-2 text-xs text-primary font-medium">
+                        {form.idDocumentName
+                          ? `Selected: ${form.idDocumentName}`
+                          : "Click to upload"}
+                      </p>
+                      {showError("idDocumentName") && (
+                        <p className="mt-2 text-xs text-destructive">{showError("idDocumentName")}</p>
+                      )}
+                    </label>
                   </div>
                 )}
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-8 flex items-center gap-2">
-              {step > 0 && (
-                <Button variant="outline" onClick={back} className="rounded-xl h-11">
-                  <ArrowLeft className="mr-1 h-4 w-4" /> Previous
-                </Button>
+            <div className="mt-8 flex flex-col gap-2">
+              {attempted && !stepValid && (
+                <p className="text-xs text-destructive text-right">
+                  Fix the highlighted fields before continuing.
+                </p>
               )}
-              <div className="ml-auto">
-                {step < steps.length - 1 ? (
-                  <Button
-                    onClick={next}
-                    className="rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft"
-                  >
-                    Continue <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    disabled={submitting}
-                    onClick={submit}
-                    className="rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft"
-                  >
-                    <Sparkles className="mr-1 h-4 w-4" />{" "}
-                    {submitting ? "Submitting..." : "Submit application"}
+              <div className="flex items-center gap-2">
+                {step > 0 && (
+                  <Button variant="outline" onClick={back} className="rounded-xl h-11">
+                    <ArrowLeft className="mr-1 h-4 w-4" /> Previous
                   </Button>
                 )}
+                <div className="ml-auto">
+                  {step < steps.length - 1 ? (
+                    <Button
+                      onClick={next}
+                      aria-disabled={!stepValid}
+                      className={cn(
+                        "rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft",
+                        !stepValid && "opacity-70",
+                      )}
+                    >
+                      Continue <ArrowRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={submitting}
+                      aria-disabled={!stepValid || submitting}
+                      onClick={submit}
+                      className={cn(
+                        "rounded-xl h-11 gradient-brand text-white font-semibold shadow-soft",
+                        !stepValid && "opacity-70",
+                      )}
+                    >
+                      <Sparkles className="mr-1 h-4 w-4" />{" "}
+                      {submitting ? "Submitting..." : "Submit application"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Live quote */}
           <aside className="card-soft p-6 h-fit sticky top-24">
-            <p className="text-sm font-semibold text-muted-foreground">Your quote</p>
-            <p className="mt-2 text-3xl font-bold tabular-nums">{kes(amount)}</p>
-            <p className="text-xs text-muted-foreground">{months} month repayment</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-muted-foreground">Your quote</p>
+              {quoteUpdating && (
+                <span className="text-[11px] text-muted-foreground animate-pulse">
+                  Updating quote…
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-3xl font-bold tabular-nums">{kes(quote.amount)}</p>
+            <p className="text-xs text-muted-foreground">{quote.months} month repayment</p>
             <div className="mt-5 space-y-3 text-sm">
-              <Row label="Principal" value={kes(amount)} />
-              <Row label={`Interest (${months}mo)`} value={kes(quote.interest)} />
+              <Row label="Principal" value={kes(quote.amount)} />
+              <Row label={`Interest (${quote.months}mo)`} value={kes(quote.interest)} />
               <Row label="Processing fee" value={kes(quote.fee)} />
               <div className="h-px bg-border my-1" />
               <Row label="Monthly payment" value={kes(quote.monthly)} bold />
               <Row label="Total payable" value={kes(quote.totalPayable)} bold />
             </div>
+            {quote.notes && (
+              <p className="mt-4 text-xs text-muted-foreground leading-relaxed">{quote.notes}</p>
+            )}
             <p className="mt-5 text-xs text-muted-foreground">
               Final terms subject to eligibility assessment.
             </p>
@@ -353,14 +641,103 @@ function ApplyPage() {
   );
 }
 
+function requiredText(value: string, label: string) {
+  if (!value.trim()) return `${label} is required`;
+  return null;
+}
+
+function requiredNonNegative(value: string, label: string) {
+  if (value.trim() === "") return `${label} is required`;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return `Enter a valid ${label.toLowerCase()}`;
+  return null;
+}
+
+function validateStep(step: number, form: FormState): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (step === 0) {
+    const nameErr = requiredText(form.fullName, "Full name");
+    if (nameErr) errors.fullName = nameErr;
+    const idErr = kenyanNationalIdError(form.nationalId);
+    if (idErr) errors.nationalId = idErr;
+    const phoneErr = kenyanPhoneError(form.phone);
+    if (phoneErr) errors.phone = phoneErr;
+    const mpesaErr = kenyanPhoneError(form.mpesaNumber);
+    if (mpesaErr) errors.mpesaNumber = mpesaErr.replace("Phone number", "M-Pesa number");
+  }
+
+  if (step === 1) {
+    if (!form.employmentStatus.trim()) errors.employmentStatus = "Employment status is required";
+    const employerErr = requiredText(form.employer, "Employer");
+    if (employerErr) errors.employer = employerErr;
+    const titleErr = requiredText(form.jobTitle, "Job title");
+    if (titleErr) errors.jobTitle = titleErr;
+    if (form.yearsAtEmployer.trim() === "") {
+      errors.yearsAtEmployer = "Years at employer is required";
+    } else {
+      const years = Number(form.yearsAtEmployer);
+      if (!Number.isFinite(years) || years < 0) {
+        errors.yearsAtEmployer = "Enter a valid number of years";
+      }
+    }
+  }
+
+  if (step === 2) {
+    if (form.monthlyIncome.trim() === "") {
+      errors.monthlyIncome = "Monthly income is required";
+    } else {
+      const income = Number(form.monthlyIncome);
+      if (!Number.isFinite(income) || income <= 0) {
+        errors.monthlyIncome = "Enter a monthly income greater than zero";
+      }
+    }
+    const expensesErr = requiredNonNegative(form.monthlyExpenses, "Monthly expenses");
+    if (expensesErr) errors.monthlyExpenses = expensesErr;
+    const loansErr = requiredNonNegative(form.existingLoans, "Existing loans");
+    if (loansErr) errors.existingLoans = loansErr;
+    const rentErr = requiredNonNegative(form.rentMortgage, "Rent / mortgage");
+    if (rentErr) errors.rentMortgage = rentErr;
+  }
+
+  if (step === 3) {
+    if (!form.purpose.trim()) errors.purpose = "Loan purpose is required";
+  }
+
+  if (step === 4) {
+    if (!form.idDocumentName.trim()) {
+      errors.idDocumentName = "Upload your National ID to continue";
+    }
+  }
+
+  return errors;
+}
+
 function Field({
   label,
+  error,
+  required: isRequired,
+  id,
   ...rest
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  error?: string;
+}) {
+  const fieldId = id ?? rest.name;
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input className="h-11 rounded-xl" {...rest} />
+      <Label htmlFor={fieldId}>
+        {label}
+        {isRequired ? <span className="text-destructive"> *</span> : null}
+      </Label>
+      <Input
+        id={fieldId}
+        className={cn("h-11 rounded-xl", error && "border-destructive focus-visible:ring-destructive")}
+        aria-invalid={Boolean(error)}
+        required={isRequired}
+        {...rest}
+      />
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

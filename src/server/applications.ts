@@ -9,7 +9,7 @@ import {
   type ApplicationStatus,
 } from "@/lib/models/application";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
-import { processingFee } from "@/lib/loan";
+import { buildLoanQuote } from "@/lib/loan";
 import { applicationStatusForReview } from "@/lib/admin-domain";
 import { requireAdmin, requireUserId } from "@/server/auth";
 
@@ -150,11 +150,10 @@ export const createApplication = createServerFn({ method: "POST" })
     const applicationNumber = nextApplicationNumber(count);
     const applicant =
       [user.firstName, user.lastName].filter(Boolean).join(" ") || "HarakaCash user";
-    const fee = processingFee(data.amount);
-    const interest = Math.round(
-      data.amount * (lendingSettings.monthlyInterestRate / 100) * data.months,
-    );
-    const totalPayable = data.amount + interest + fee;
+    const quote = buildLoanQuote(data.amount, data.months, {
+      monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
+      minProcessingFee: lendingSettings.minProcessingFee,
+    });
 
     const doc: ApplicationRecord = {
       applicationNumber,
@@ -171,12 +170,12 @@ export const createApplication = createServerFn({ method: "POST" })
       riskScore: 100 - user.eligibilityScore,
       status: "Pending",
       quote: {
-        amount: data.amount,
-        months: data.months,
-        fee,
-        interest,
-        totalPayable,
-        monthly: Math.round(totalPayable / data.months),
+        amount: quote.amount,
+        months: quote.months,
+        fee: quote.fee,
+        interest: quote.interest,
+        totalPayable: quote.totalPayable,
+        monthly: quote.monthly,
       },
       createdAt: now,
       updatedAt: now,

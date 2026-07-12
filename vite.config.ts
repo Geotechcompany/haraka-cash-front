@@ -12,11 +12,11 @@ export default defineConfig({
     allowedHosts: [".ngrok-free.app"],
   },
   ssr: {
-    external: ["mongodb", "bson"],
+    external: ["mongodb", "bson", "@google/generative-ai"],
     noExternal: ["@clerk/tanstack-react-start", "@clerk/react", "@clerk/shared"],
   },
   optimizeDeps: {
-    exclude: ["mongodb", "bson"],
+    exclude: ["mongodb", "bson", "@google/generative-ai"],
   },
   plugins: [
     tsConfigPaths(),

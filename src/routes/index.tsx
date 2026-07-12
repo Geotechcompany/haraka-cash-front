@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Gift, LayoutDashboard } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ const springSoft = { type: "spring" as const, bounce: 0, duration: 0.55 };
 
 function Landing() {
   const reduceMotion = useReducedMotion();
+  const { isSignedIn } = useAuth();
 
   return (
     <div className="min-h-dvh bg-background font-sans">
@@ -79,14 +81,35 @@ function Landing() {
               FAQ
             </a>
           </nav>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
-            <Button variant="ghost" asChild className="hidden sm:inline-flex">
-              <Link to="/login">Sign in</Link>
-            </Button>
-            <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
-              <Link to="/register">Apply</Link>
-            </Button>
+            {isSignedIn ? (
+              <>
+                <Button variant="ghost" size="sm" className="gap-1.5 px-2.5" asChild>
+                  <Link to="/referrals">
+                    <Gift className="h-[18px] w-[18px]" aria-hidden />
+                    <span className="text-sm font-medium">Invite</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="icon" aria-label="Dashboard" asChild>
+                  <Link to="/dashboard">
+                    <LayoutDashboard className="h-[18px] w-[18px]" />
+                  </Link>
+                </Button>
+                <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
+                  <Link to="/apply">Apply</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild className="hidden sm:inline-flex">
+                  <Link to="/login">Sign in</Link>
+                </Button>
+                <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
+                  <Link to="/register">Apply</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -351,10 +374,24 @@ function Landing() {
           </div>
           {(
             [
-              { heading: "Product", links: [["Apply", "/register"], ["Dashboard", "/dashboard"], ["How it works", "#how"]] },
-              { heading: "Help", links: [["FAQ", "#faq"], ["Support", "/support"], ["Sign in", "/login"]] },
+              {
+                heading: "Product",
+                links: [
+                  ["Apply", isSignedIn ? "/apply" : "/register"],
+                  ["Dashboard", "/dashboard"],
+                  ["How it works", "#how"],
+                ],
+              },
+              {
+                heading: "Help",
+                links: [
+                  ["FAQ", "#faq"],
+                  ["Support", "/support"],
+                  isSignedIn ? ["Invite", "/referrals"] : ["Sign in", "/login"],
+                ],
+              },
               { heading: "Legal", links: [["Terms", "/terms"], ["Privacy", "/privacy"], ["Compliance", "#"]] },
-            ] as const
+            ] as { heading: string; links: readonly (readonly [string, string])[] }[]
           ).map((column) => (
             <div key={column.heading}>
               <p className="text-sm font-semibold">{column.heading}</p>

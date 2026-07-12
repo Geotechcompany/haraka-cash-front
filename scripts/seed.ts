@@ -7,7 +7,11 @@ import type { ApplicationRecord } from "../src/lib/models/application";
 import type { LoanRecord, RepaymentRecord } from "../src/lib/models/loan";
 import type { NotificationRecord } from "../src/lib/models/notification";
 import type { PaymentRecord } from "../src/lib/models/payment";
-import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettingsRecord } from "../src/lib/models/settings";
+import {
+  DEFAULT_PLATFORM_SETTINGS,
+  PLATFORM_SETTINGS_KEY,
+  type PlatformSettingsRecord,
+} from "../src/lib/models/settings";
 import type { SupportTicketRecord } from "../src/lib/models/support";
 import type { UserRecord } from "../src/lib/models/user";
 import {
@@ -182,7 +186,16 @@ async function seed() {
   await db.collection<SupportTicketRecord>("support_tickets").insertOne(ticket);
 
   const settings: PlatformSettingsRecord = {
-    ...DEFAULT_PLATFORM_SETTINGS,
+    key: PLATFORM_SETTINGS_KEY,
+    minLoanAmount: DEFAULT_PLATFORM_SETTINGS.minLoanAmount,
+    maxLoanAmount: DEFAULT_PLATFORM_SETTINGS.maxLoanAmount,
+    minProcessingFee: DEFAULT_PLATFORM_SETTINGS.minProcessingFee,
+    monthlyInterestRate: DEFAULT_PLATFORM_SETTINGS.monthlyInterestRate,
+    lateFeeRate: DEFAULT_PLATFORM_SETTINGS.lateFeeRate,
+    automatedApprovals: DEFAULT_PLATFORM_SETTINGS.automatedApprovals,
+    fraudChecks: DEFAULT_PLATFORM_SETTINGS.fraudChecks,
+    smsNotifications: DEFAULT_PLATFORM_SETTINGS.smsNotifications,
+    maintenanceMode: DEFAULT_PLATFORM_SETTINGS.maintenanceMode,
     createdAt: now,
     updatedAt: now,
   };
