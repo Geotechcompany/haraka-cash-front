@@ -3,12 +3,38 @@ import { z } from "zod";
 
 import {
   PLATFORM_SETTINGS_KEY,
+  QUOTE_AI_PROVIDERS,
   toPlatformSettings,
   type PlatformSettingsRecord,
 } from "@/lib/models/settings";
 import { requireAdmin } from "@/server/auth";
 
 const MASK_PATTERN = /^•+$/;
+
+function isMaskedSecretInput(value: string) {
+  return MASK_PATTERN.test(value) || value.startsWith("••••");
+}
+
+/**
+ * Secret key update semantics (gemini / openai):
+ * - omit / undefined → keep existing
+ * - string of only • (masked) or starts with •••• → keep existing
+ * - "" → clear stored key (fall back to env)
+ * - any other string → save as new key
+ */
+function applySecretKeyUpdate(
+  input: string | undefined,
+  field: "geminiApiKey" | "openaiApiKey",
+  $set: Partial<PlatformSettingsRecord>,
+) {
+  if (input === undefined) return;
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    $set[field] = "";
+  } else if (!isMaskedSecretInput(trimmed)) {
+    $set[field] = trimmed;
+  }
+}
 
 const platformSettingsInput = z
   .object({
@@ -21,14 +47,9 @@ const platformSettingsInput = z
     fraudChecks: z.boolean(),
     smsNotifications: z.boolean(),
     maintenanceMode: z.boolean(),
-    /**
-     * Gemini key update:
-     * - omit / undefined → keep existing
-     * - string of only • (masked) → keep existing
-     * - "" → clear stored key (fall back to env)
-     * - any other string → save as new key
-     */
+    quoteAiProvider: z.enum(QUOTE_AI_PROVIDERS),
     geminiApiKey: z.string().optional(),
+    openaiApiKey: z.string().optional(),
   })
   .refine((settings) => settings.maxLoanAmount >= settings.minLoanAmount, {
     message: "Maximum loan amount must be greater than or equal to the minimum",
@@ -63,6 +84,18 @@ export async function resolveGeminiApiKey() {
   );
 }
 
+/**
+ * Resolution order for OpenAI:
+ * 1. Admin-saved platform setting `openaiApiKey`
+ * 2. `OPENAI_API_KEY` env
+ */
+export async function resolveOpenAiApiKey() {
+  const record = await readPlatformSettingsRecord();
+  const fromAdmin = record?.openaiApiKey?.trim();
+  if (fromAdmin) return fromAdmin;
+  return process.env.OPENAI_API_KEY?.trim() || "";
+}
+
 export const getAdminPlatformSettings = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
   return readPlatformSettings();
@@ -87,7 +120,12 @@ export const updateAdminPlatformSettings = createServerFn({ method: "POST" })
     const db = await getDb();
     const now = new Date();
 
-    const { geminiApiKey: geminiApiKeyInput, ...policyFields } = data;
+    const {
+      geminiApiKey: geminiApiKeyInput,
+      openaiApiKey: openaiApiKeyInput,
+      ...policyFields
+    } = data;
+
     const $set: Partial<PlatformSettingsRecord> & {
       updatedBy: string;
       updatedAt: Date;
@@ -97,15 +135,8 @@ export const updateAdminPlatformSettings = createServerFn({ method: "POST" })
       updatedAt: now,
     };
 
-    if (geminiApiKeyInput !== undefined) {
-      const trimmed = geminiApiKeyInput.trim();
-      if (trimmed === "") {
-        $set.geminiApiKey = "";
-      } else if (!MASK_PATTERN.test(trimmed) && !trimmed.startsWith("••••")) {
-        $set.geminiApiKey = trimmed;
-      }
-      // masked / bullet-only value → leave existing key unchanged
-    }
+    applySecretKeyUpdate(geminiApiKeyInput, "geminiApiKey", $set);
+    applySecretKeyUpdate(openaiApiKeyInput, "openaiApiKey", $set);
 
     await db.collection<PlatformSettingsRecord>("settings").updateOne(
       { key: PLATFORM_SETTINGS_KEY },

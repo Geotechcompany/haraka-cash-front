@@ -19,7 +19,10 @@ export type ApplicationRecord = {
   applicationNumber: string;
   clerkUserId?: string;
   applicant: string;
+  /** Contact phone from the apply form. */
   phone: string;
+  /** M-Pesa MSISDN for STK / disbursement (apply-form “M-Pesa number”). */
+  mpesaNumber?: string;
   county: string;
   employer: string;
   monthlyIncome: number;
@@ -49,6 +52,7 @@ export type Application = {
   id: string;
   applicant: string;
   phone: string;
+  mpesaNumber: string;
   county: string;
   employer: string;
   monthlyIncome: number;
@@ -65,11 +69,21 @@ export type Application = {
   createdAt: string;
 };
 
+/** Phone used for loan-related STK (prefer apply-form M-Pesa number). */
+export function applicationStkPhone(doc: Pick<ApplicationRecord, "mpesaNumber" | "phone">): string {
+  const mpesa = doc.mpesaNumber?.trim();
+  if (mpesa) return mpesa;
+  const phone = doc.phone?.trim();
+  if (phone && !/x/i.test(phone)) return phone;
+  return "";
+}
+
 export function toApplication(doc: ApplicationRecord): Application {
   return {
     id: doc.applicationNumber,
     applicant: doc.applicant,
     phone: doc.phone,
+    mpesaNumber: doc.mpesaNumber?.trim() || doc.phone,
     county: doc.county,
     employer: doc.employer,
     monthlyIncome: doc.monthlyIncome,

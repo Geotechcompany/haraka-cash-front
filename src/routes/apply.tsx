@@ -191,6 +191,8 @@ function ApplyPage() {
           amount,
           months,
           purpose: form.purpose,
+          phone: form.phone.trim(),
+          mpesaNumber: form.mpesaNumber.trim(),
           employer: form.employer.trim(),
           monthlyIncome: Number(form.monthlyIncome) || 0,
           quote: {

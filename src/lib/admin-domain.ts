@@ -18,6 +18,11 @@ export function applicationStatusForReview(action: ApplicationReviewAction): App
   return "DocumentsRequired";
 }
 
+/** Post-fee statuses require a confirmed successful processing-fee payment. */
+export function statusRequiresConfirmedProcessingFee(status: ApplicationStatus): boolean {
+  return status === "UnderReview" || status === "Disbursing";
+}
+
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);

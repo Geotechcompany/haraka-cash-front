@@ -7,6 +7,14 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { QuoteAiProvider } from "@/lib/models/settings";
 import { getAdminPlatformSettings, updateAdminPlatformSettings } from "@/server/settings";
 
 export const Route = createFileRoute("/admin/settings")({
@@ -21,6 +29,9 @@ function AdminSettingsPage() {
   const [settings, setSettings] = useState(initialSettings);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState(
     initialSettings.geminiApiKeyMasked || "",
+  );
+  const [openaiApiKeyInput, setOpenaiApiKeyInput] = useState(
+    initialSettings.openaiApiKeyMasked || "",
   );
   const [isSaving, setIsSaving] = useState(false);
 
@@ -46,7 +57,8 @@ function AdminSettingsPage() {
   const save = async () => {
     setIsSaving(true);
     try {
-      const keyChanged = geminiApiKeyInput !== (settings.geminiApiKeyMasked || "");
+      const geminiChanged = geminiApiKeyInput !== (settings.geminiApiKeyMasked || "");
+      const openaiChanged = openaiApiKeyInput !== (settings.openaiApiKeyMasked || "");
       const updated = await updateSettings({
         data: {
           minLoanAmount: settings.minLoanAmount,
@@ -58,11 +70,14 @@ function AdminSettingsPage() {
           fraudChecks: settings.fraudChecks,
           smsNotifications: settings.smsNotifications,
           maintenanceMode: settings.maintenanceMode,
-          ...(keyChanged ? { geminiApiKey: geminiApiKeyInput } : {}),
+          quoteAiProvider: settings.quoteAiProvider,
+          ...(geminiChanged ? { geminiApiKey: geminiApiKeyInput } : {}),
+          ...(openaiChanged ? { openaiApiKey: openaiApiKeyInput } : {}),
         },
       });
       setSettings(updated);
       setGeminiApiKeyInput(updated.geminiApiKeyMasked || "");
+      setOpenaiApiKeyInput(updated.openaiApiKeyMasked || "");
       toast.success("Platform settings saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save settings");
@@ -130,27 +145,79 @@ function AdminSettingsPage() {
             />
           </div>
 
-          <div className="mt-6 space-y-1.5">
-            <Label htmlFor="gemini-api-key">Gemini API key</Label>
-            <Input
-              id="gemini-api-key"
-              type="password"
-              autoComplete="off"
-              className="h-11 rounded-xl font-mono text-sm"
-              value={geminiApiKeyInput}
-              placeholder="Paste key, or leave blank to use env"
-              onChange={(event) => setGeminiApiKeyInput(event.target.value)}
-              onFocus={() => {
-                if (geminiApiKeyInput.startsWith("••••")) {
-                  setGeminiApiKeyInput("");
+          <div className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="quote-ai-provider">Quote AI provider</Label>
+              <Select
+                value={settings.quoteAiProvider}
+                onValueChange={(value) =>
+                  setSettings((current) => ({
+                    ...current,
+                    quoteAiProvider: value as QuoteAiProvider,
+                  }))
                 }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              {settings.geminiApiKeyConfigured
-                ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
-                : "No admin key saved. Quote AI uses GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY if set."}
-            </p>
+              >
+                <SelectTrigger id="quote-ai-provider" className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (Gemini, then OpenAI)</SelectItem>
+                  <SelectItem value="gemini">Gemini</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="off">Off</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Money math stays local. AI only adds notes and risk band. Missing keys fall back to
+                the other provider, then local-only.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="gemini-api-key">Gemini API key</Label>
+              <Input
+                id="gemini-api-key"
+                type="password"
+                autoComplete="off"
+                className="h-11 rounded-xl font-mono text-sm"
+                value={geminiApiKeyInput}
+                placeholder="Paste key, or leave blank to use env"
+                onChange={(event) => setGeminiApiKeyInput(event.target.value)}
+                onFocus={() => {
+                  if (geminiApiKeyInput.startsWith("••••")) {
+                    setGeminiApiKeyInput("");
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {settings.geminiApiKeyConfigured
+                  ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
+                  : "No admin key saved. Uses GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY if set."}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="openai-api-key">OpenAI API key</Label>
+              <Input
+                id="openai-api-key"
+                type="password"
+                autoComplete="off"
+                className="h-11 rounded-xl font-mono text-sm"
+                value={openaiApiKeyInput}
+                placeholder="Paste key, or leave blank to use env"
+                onChange={(event) => setOpenaiApiKeyInput(event.target.value)}
+                onFocus={() => {
+                  if (openaiApiKeyInput.startsWith("••••")) {
+                    setOpenaiApiKeyInput("");
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {settings.openaiApiKeyConfigured
+                  ? "Key is saved. Focus the field to replace it, or clear and save to fall back to env."
+                  : "No admin key saved. Uses OPENAI_API_KEY if set."}
+              </p>
+            </div>
           </div>
 
           <Button

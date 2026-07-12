@@ -286,6 +286,7 @@ function ApplicationsPage() {
             <div className="grid gap-3 text-sm sm:grid-cols-2">
               <Detail label="Applicant" value={detail.applicant} />
               <Detail label="Phone" value={detail.phone} />
+              <Detail label="M-Pesa" value={detail.mpesaNumber} />
               <Detail label="Amount" value={kes(detail.amount)} />
               <Detail label="Term" value={`${detail.months} months`} />
               <Detail label="Income" value={kes(detail.monthlyIncome)} />

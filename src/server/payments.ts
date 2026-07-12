@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import type { ApplicationRecord } from "@/lib/models/application";
+import { applicationStkPhone, type ApplicationRecord } from "@/lib/models/application";
 import {
   paymentReference,
   toPayment,
@@ -9,6 +9,27 @@ import {
   type PaymentStatus,
 } from "@/lib/models/payment";
 import { requireAdmin, requireUserId } from "@/server/auth";
+
+/** Confirmed processing-fee payment for an application, or null. */
+export async function findSuccessfulProcessingFee(applicationNumber: string) {
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  return db.collection<PaymentRecord>("payments").findOne({
+    applicationNumber,
+    kind: "processing_fee",
+    status: "success",
+  });
+}
+
+export async function requireSuccessfulProcessingFee(applicationNumber: string) {
+  const payment = await findSuccessfulProcessingFee(applicationNumber);
+  if (!payment) {
+    throw new Error(
+      "Processing fee payment has not been confirmed. The applicant must complete M-Pesa payment first.",
+    );
+  }
+  return payment;
+}
 
 export const getWalletBalance = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
@@ -51,7 +72,6 @@ export const listPaymentTransactions = createServerFn({ method: "GET" }).handler
 
 const processingFeeInput = z.object({
   applicationNumber: z.string().min(1),
-  phone: z.string().min(9),
 });
 
 export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
@@ -73,10 +93,17 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
     const fee = application.quote?.fee;
     if (!fee || fee <= 0) throw new Error("Processing fee is not available for this application");
 
+    const stkPhone = applicationStkPhone(application);
+    if (!stkPhone) {
+      throw new Error(
+        "No M-Pesa number on this application. Re-apply with your M-Pesa number or contact support.",
+      );
+    }
+
     const reference = paymentReference("FEE");
     const { normalizeKenyanPhone, initiateProcessingFeeStkPush } =
       await import("@/lib/smply-pay.server");
-    const phone = normalizeKenyanPhone(data.phone);
+    const phone = normalizeKenyanPhone(stkPhone);
     const now = new Date();
 
     const provider = await initiateProcessingFeeStkPush({
@@ -84,15 +111,18 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
       amount: fee,
       reference,
       description: `HarakaCash processing fee for ${application.applicationNumber}`,
-      orderCode: application.applicationNumber,
     });
+
+    // Never advance on STK-sent alone — webhook / confirmed status owns UnderReview.
+    const paymentStatus: PaymentStatus =
+      provider.status === "failed" ? "failed" : "pending";
 
     const payment: PaymentRecord = {
       reference,
       kind: "processing_fee",
       amount: fee,
       phone,
-      status: provider.status,
+      status: paymentStatus,
       provider: "smply_pay",
       providerRef: provider.providerRef,
       clerkUserId,
@@ -105,20 +135,19 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
 
     await db.collection<PaymentRecord>("payments").insertOne(payment);
 
-    if (provider.status === "success") {
-      await markApplicationUnderReview(application.applicationNumber);
+    if (paymentStatus === "failed") {
       return {
         reference,
-        status: provider.status,
-        message:
-          "Fee received. Your application is with our team for CRB (credit bureau) checks.",
+        status: paymentStatus,
+        message: provider.message ?? "STK push failed. You can try again.",
       };
     }
 
     return {
       reference,
-      status: provider.status,
-      message: provider.message ?? "STK push sent. Check your phone to enter your M-Pesa PIN.",
+      status: paymentStatus,
+      message:
+        "Enter M-Pesa PIN on your phone. We'll continue when the fee is received.",
     };
   });
 
@@ -186,11 +215,23 @@ export const getPaymentStatus = createServerFn({ method: "GET" })
       clerkUserId,
     });
     if (!payment) return null;
+
+    // If webhook already marked success, ensure application moves to UnderReview.
+    if (
+      payment.status === "success" &&
+      payment.kind === "processing_fee" &&
+      payment.applicationNumber
+    ) {
+      await markApplicationUnderReview(payment.applicationNumber);
+    }
+
     return { reference: payment.reference, status: payment.status };
   });
 
 /** After processing fee success: queue for team CRB checks (do not disburse). */
 export async function markApplicationUnderReview(applicationNumber: string) {
+  await requireSuccessfulProcessingFee(applicationNumber);
+
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const application = await db
@@ -223,6 +264,8 @@ export async function markApplicationUnderReview(applicationNumber: string) {
 
 /** After team CRB clearance: start disbursement and create the loan record. */
 export async function markApplicationDisbursing(applicationNumber: string) {
+  await requireSuccessfulProcessingFee(applicationNumber);
+
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const application = await db

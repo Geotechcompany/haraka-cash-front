@@ -56,6 +56,7 @@ async function seed() {
     clerkUserId: `demo-user-${(index % 4) + 1}`,
     applicant: app.applicant,
     phone: app.phone,
+    mpesaNumber: app.phone,
     county: app.county,
     employer: app.employer,
     monthlyIncome: app.monthlyIncome,

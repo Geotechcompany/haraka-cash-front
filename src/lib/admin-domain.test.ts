@@ -6,6 +6,7 @@ import {
   applyRepayment,
   buildRepaymentSchedule,
   isAdminMetadata,
+  statusRequiresConfirmedProcessingFee,
 } from "@/lib/admin-domain";
 import { toPlatformSettings } from "@/lib/models/settings";
 import { createReportFileResponse, type ReportRow } from "@/server/reports";
@@ -32,6 +33,13 @@ test("application review actions resolve to durable statuses", () => {
   assert.equal(applicationStatusForReview("approve"), "Approved");
   assert.equal(applicationStatusForReview("decline"), "Declined");
   assert.equal(applicationStatusForReview("requestDocuments"), "DocumentsRequired");
+});
+
+test("UnderReview and Disbursing require a confirmed processing fee", () => {
+  assert.equal(statusRequiresConfirmedProcessingFee("UnderReview"), true);
+  assert.equal(statusRequiresConfirmedProcessingFee("Disbursing"), true);
+  assert.equal(statusRequiresConfirmedProcessingFee("Approved"), false);
+  assert.equal(statusRequiresConfirmedProcessingFee("Pending"), false);
 });
 
 test("repayment schedule preserves principal, interest, and total", () => {
@@ -99,8 +107,11 @@ test("platform settings mapper supplies defaults for legacy records", () => {
   assert.equal(settings.maxLoanAmount, 75_000);
   assert.equal(settings.minProcessingFee, 150);
   assert.equal(settings.monthlyInterestRate, 6);
+  assert.equal(settings.quoteAiProvider, "auto");
   assert.equal(settings.geminiApiKeyConfigured, false);
   assert.equal(settings.geminiApiKeyMasked, "");
+  assert.equal(settings.openaiApiKeyConfigured, false);
+  assert.equal(settings.openaiApiKeyMasked, "");
 });
 
 test("platform settings masks Gemini API key and never exposes raw value", () => {
@@ -111,6 +122,18 @@ test("platform settings masks Gemini API key and never exposes raw value", () =>
   assert.equal(settings.geminiApiKeyConfigured, true);
   assert.equal(settings.geminiApiKeyMasked, "••••••••1234");
   assert.equal("geminiApiKey" in settings, false);
+});
+
+test("platform settings masks OpenAI API key and never exposes raw value", () => {
+  const settings = toPlatformSettings({
+    key: "platform-lending",
+    openaiApiKey: "sk-proj-SecretOpenAiKey9999",
+    quoteAiProvider: "openai",
+  });
+  assert.equal(settings.openaiApiKeyConfigured, true);
+  assert.equal(settings.openaiApiKeyMasked, "••••••••9999");
+  assert.equal(settings.quoteAiProvider, "openai");
+  assert.equal("openaiApiKey" in settings, false);
 });
 
 test("CSV report response sets download headers and serializes rows", async () => {

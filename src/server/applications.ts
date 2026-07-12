@@ -10,7 +10,8 @@ import {
 } from "@/lib/models/application";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
 import { buildLoanQuote } from "@/lib/loan";
-import { applicationStatusForReview } from "@/lib/admin-domain";
+import { isValidKenyanPhone } from "@/lib/kenya-format";
+import { applicationStatusForReview, statusRequiresConfirmedProcessingFee } from "@/lib/admin-domain";
 import { requireAdmin, requireUserId } from "@/server/auth";
 
 async function ensureUser(clerkId: string) {
@@ -108,10 +109,19 @@ export const getAdminApplication = createServerFn({ method: "GET" })
     return { ...toApplication(doc), quote: doc.quote ?? null };
   });
 
+const kenyanMobile = z
+  .string()
+  .min(9)
+  .refine((value) => isValidKenyanPhone(value), {
+    message: "Enter a valid Kenyan mobile number",
+  });
+
 const createApplicationInput = z.object({
   amount: z.number().positive(),
   months: z.number().int().positive(),
   purpose: z.string().min(1).default("Personal"),
+  phone: kenyanMobile,
+  mpesaNumber: kenyanMobile,
   county: z.string().optional(),
   employer: z.string().optional(),
   monthlyIncome: z.number().optional(),
@@ -155,11 +165,16 @@ export const createApplication = createServerFn({ method: "POST" })
       minProcessingFee: lendingSettings.minProcessingFee,
     });
 
+    const { toSmplyPhoneNumber } = await import("@/lib/smply-pay.server");
+    const contactPhone = toSmplyPhoneNumber(data.phone);
+    const mpesaNumber = toSmplyPhoneNumber(data.mpesaNumber);
+
     const doc: ApplicationRecord = {
       applicationNumber,
       clerkUserId,
       applicant,
-      phone: user.phone ?? "07xx xxx xxx",
+      phone: contactPhone,
+      mpesaNumber,
       county: data.county ?? user.county ?? "Nairobi",
       employer: data.employer ?? "Not specified",
       monthlyIncome: data.monthlyIncome ?? 0,
@@ -289,7 +304,9 @@ export const reviewApplication = createServerFn({ method: "POST" })
 
     // Fee paid + CRB queue: admin approve starts disbursement (does not re-open offer).
     if (data.action === "approve" && application.status === "UnderReview") {
-      const { markApplicationDisbursing } = await import("@/server/payments");
+      const { markApplicationDisbursing, requireSuccessfulProcessingFee } =
+        await import("@/server/payments");
+      await requireSuccessfulProcessingFee(data.applicationNumber);
       await db.collection<ApplicationRecord>("applications").updateOne(
         { applicationNumber: data.applicationNumber },
         {
@@ -384,6 +401,10 @@ export const updateApplicationStatus = createServerFn({ method: "POST" })
   .validator((data: unknown) => updateStatusInput.parse(data))
   .handler(async ({ data }) => {
     await requireAdmin();
+    if (statusRequiresConfirmedProcessingFee(data.status)) {
+      const { requireSuccessfulProcessingFee } = await import("@/server/payments");
+      await requireSuccessfulProcessingFee(data.applicationNumber);
+    }
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
     await db

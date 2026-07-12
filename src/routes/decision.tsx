@@ -1,17 +1,16 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles, Smartphone, Clock } from "lucide-react";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { kes } from "@/lib/loan";
+import type { PaymentStatus } from "@/lib/models/payment";
 import { toast } from "sonner";
-import { getApplication, getCurrentUser } from "@/server/applications";
-import { initiateProcessingFeePayment } from "@/server/payments";
+import { getApplication } from "@/server/applications";
+import { getPaymentStatus, initiateProcessingFeePayment } from "@/server/payments";
 
 const decisionSearchSchema = z.object({
   applicationId: z.string().optional(),
@@ -23,16 +22,13 @@ export const Route = createFileRoute("/decision")({
   loaderDeps: ({ search }) => ({ applicationId: search?.applicationId }),
   loader: async ({ deps }) => {
     if (!deps.applicationId) {
-      return { application: null, user: null };
+      return { application: null };
     }
     try {
-      const [application, user] = await Promise.all([
-        getApplication({ data: deps.applicationId }),
-        getCurrentUser(),
-      ]);
-      return { application, user };
+      const application = await getApplication({ data: deps.applicationId });
+      return { application };
     } catch {
-      return { application: null, user: null };
+      return { application: null };
     }
   },
   component: DecisionPage,
@@ -40,11 +36,59 @@ export const Route = createFileRoute("/decision")({
 
 function DecisionPage() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { applicationId } = Route.useSearch();
-  const { application, user } = Route.useLoaderData();
+  const { application } = Route.useLoaderData();
   const payFee = useServerFn(initiateProcessingFeePayment);
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  const checkPayment = useServerFn(getPaymentStatus);
   const [paying, setPaying] = useState(false);
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
+
+  const awaitingPin =
+    pendingReference !== null &&
+    (paymentStatus === "pending" || paymentStatus === "processing" || paymentStatus === null);
+
+  useEffect(() => {
+    if (!pendingReference || !awaitingPin) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const result = await checkPayment({ data: pendingReference });
+        if (cancelled || !result) return;
+
+        setPaymentStatus(result.status);
+
+        if (result.status === "success") {
+          toast.success("Fee received. Your application is under review for CRB checks.");
+          await router.invalidate();
+          setPendingReference(null);
+          setPaying(false);
+          return;
+        }
+
+        if (result.status === "failed") {
+          toast.error("Payment was not completed. You can try again.");
+          setPendingReference(null);
+          setPaying(false);
+        }
+      } catch {
+        // Keep polling; transient errors should not unlock the fee gate.
+      }
+    };
+
+    void poll();
+    const intervalId = window.setInterval(() => {
+      void poll();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [awaitingPin, checkPayment, pendingReference, router]);
 
   if (!applicationId) {
     return (
@@ -87,6 +131,7 @@ function DecisionPage() {
   }
 
   const quote = application.quote;
+  const mpesaNumber = application.mpesaNumber?.trim() || "";
 
   if (application.status === "UnderReview") {
     return (
@@ -148,20 +193,37 @@ function DecisionPage() {
       toast.error("Application not found");
       return;
     }
+    if (!mpesaNumber) {
+      toast.error("No M-Pesa number on this application. Re-apply or contact support.");
+      return;
+    }
 
     setPaying(true);
+    setPaymentStatus(null);
     try {
       const result = await payFee({
         data: {
           applicationNumber: application.id,
-          phone,
         },
       });
-      toast.success(result.message);
-      navigate({ to: "/loans" });
+
+      if (result.status === "success") {
+        toast.success(result.message);
+        await router.invalidate();
+        return;
+      }
+
+      if (result.status === "failed") {
+        toast.error(result.message);
+        setPaying(false);
+        return;
+      }
+
+      setPendingReference(result.reference);
+      setPaymentStatus(result.status);
+      toast.message(result.message);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to initiate M-Pesa payment");
-    } finally {
       setPaying(false);
     }
   };
@@ -190,6 +252,45 @@ function DecisionPage() {
     );
   }
 
+  if (awaitingPin) {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <motion.div
+            initial={{ scale: 0.7 }}
+            animate={{ scale: 1 }}
+            className="mx-auto h-20 w-20 rounded-3xl bg-primary-soft text-primary grid place-items-center"
+          >
+            <Smartphone className="h-10 w-10" />
+          </motion.div>
+          <h1 className="mt-6 text-3xl font-bold">Waiting for M-Pesa payment</h1>
+          <p className="mt-3 text-muted-foreground">
+            Enter M-Pesa PIN on your phone. We'll continue when the fee is received.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            STK sent to <span className="font-semibold tabular-nums text-foreground">{mpesaNumber}</span> for{" "}
+            {kes(quote.fee)}.
+          </p>
+          <div className="mt-6 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            Do not leave this step until payment is confirmed. CRB review starts only after the fee is received.
+          </div>
+          <Button
+            variant="outline"
+            className="mt-6 rounded-xl h-11"
+            disabled={paying}
+            onClick={() => {
+              setPendingReference(null);
+              setPaymentStatus(null);
+              setPaying(false);
+            }}
+          >
+            Cancel and retry
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="max-w-3xl mx-auto">
@@ -206,7 +307,7 @@ function DecisionPage() {
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
           <p className="mt-3 text-muted-foreground">
-            Pay the processing fee via M-Pesa. After payment, our team runs CRB checks before disbursement.
+            Pay the processing fee via M-Pesa. After payment is confirmed, our team runs CRB checks before disbursement.
           </p>
         </div>
 
@@ -233,19 +334,20 @@ function DecisionPage() {
             <p className="font-semibold">Pay processing fee via M-Pesa</p>
           </div>
           <p className="text-sm text-muted-foreground">
-            We will send an STK push for {kes(quote.fee)}. Enter your M-Pesa PIN to accept the offer.
-            Your application then goes to our team for CRB (credit bureau) checks — disbursement follows after review.
+            We will send an STK push for {kes(quote.fee)} to the M-Pesa number from your application.
+            Enter M-Pesa PIN on your phone. We'll continue when the fee is received — then CRB review begins.
           </p>
-          <div className="mt-4 space-y-1.5">
-            <Label htmlFor="mpesa-phone">M-Pesa number</Label>
-            <Input
-              id="mpesa-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="0712 345 678"
-              className="h-11 rounded-xl"
-            />
+          <div className="mt-4 rounded-xl bg-muted/60 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">STK push will go to</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">
+              {mpesaNumber || "No M-Pesa number on file"}
+            </p>
           </div>
+          {!mpesaNumber ? (
+            <p className="mt-3 text-sm text-destructive">
+              This application has no M-Pesa number. Re-apply with your M-Pesa number or contact support.
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-6 card-soft p-6">
@@ -267,9 +369,16 @@ function DecisionPage() {
         </div>
 
         <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
-          <Button variant="outline" className="rounded-xl h-12 flex-1" onClick={() => navigate({ to: "/dashboard" })}>Reject offer</Button>
           <Button
-            disabled={paying || !phone.trim()}
+            variant="outline"
+            className="rounded-xl h-12 flex-1"
+            disabled={paying}
+            onClick={() => navigate({ to: "/dashboard" })}
+          >
+            Reject offer
+          </Button>
+          <Button
+            disabled={paying || !mpesaNumber}
             className="rounded-xl h-12 flex-1 gradient-brand text-white font-semibold shadow-soft"
             onClick={handleAccept}
           >

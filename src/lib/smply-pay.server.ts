@@ -273,8 +273,9 @@ export async function initiateProcessingFeeStkPush(input: {
   ]);
   const message = pickString(raw, ["message", "CustomerMessage", "ResponseDescription"]);
   const statusValue = pickString(raw, ["status", "state"]);
+  // STK API "success" means the prompt was accepted — not that money was received.
   const status: SmplyStkPushResult["status"] =
-    statusValue === "success" || statusValue === "completed" ? "success" : "pending";
+    statusValue === "failed" || statusValue === "cancelled" ? "failed" : "pending";
 
   return {
     reference: input.reference,

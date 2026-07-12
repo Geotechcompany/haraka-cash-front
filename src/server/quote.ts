@@ -22,7 +22,7 @@ export type GeneratedLoanQuote = {
   monthly: number;
   notes?: string;
   riskBand?: "low" | "moderate" | "elevated" | "high";
-  source: "gemini" | "local";
+  source: "gemini" | "openai" | "local";
 };
 
 function moneyMatchesBaseline(
@@ -48,8 +48,8 @@ function moneyMatchesBaseline(
 
 /**
  * Builds a loan quote. Money math always comes from buildLoanQuote / processingFee
- * (with admin minProcessingFee floor). Gemini may add notes + riskBand.
- * Falls back to local calc if Gemini is missing or invalid.
+ * (with admin minProcessingFee floor). Gemini or OpenAI may add notes + riskBand.
+ * Falls back to local calc if no provider key works or the response is invalid.
  */
 export const generateLoanQuote = createServerFn({ method: "POST" })
   .validator((input: unknown) => generateLoanQuoteInput.parse(input))
@@ -73,38 +73,43 @@ export const generateLoanQuote = createServerFn({ method: "POST" })
     };
 
     try {
-      const { requestGeminiLoanQuote } = await import("@/server/quote-ai.server");
-      const ai = await requestGeminiLoanQuote({
-        amount,
-        months,
-        monthlyIncome: data.monthlyIncome,
-        monthlyExpenses: data.monthlyExpenses,
-        existingLoans: data.existingLoans,
-        employmentStatus: data.employmentStatus,
-        purpose: data.purpose,
-        minLoanAmount: policy.minLoanAmount,
-        maxLoanAmount: policy.maxLoanAmount,
-        minProcessingFee: policy.minProcessingFee,
-        monthlyInterestRate: policy.monthlyInterestRate,
-        baseline,
-      });
+      const { requestLoanQuoteAiNotes } = await import("@/server/quote-ai.server");
+      const ai = await requestLoanQuoteAiNotes(
+        {
+          amount,
+          months,
+          monthlyIncome: data.monthlyIncome,
+          monthlyExpenses: data.monthlyExpenses,
+          existingLoans: data.existingLoans,
+          employmentStatus: data.employmentStatus,
+          purpose: data.purpose,
+          minLoanAmount: policy.minLoanAmount,
+          maxLoanAmount: policy.maxLoanAmount,
+          minProcessingFee: policy.minProcessingFee,
+          monthlyInterestRate: policy.monthlyInterestRate,
+          baseline,
+        },
+        policy.quoteAiProvider,
+      );
 
       if (!ai) return local;
 
-      if (!moneyMatchesBaseline(baseline, ai)) {
+      const { payload, source } = ai;
+
+      if (!moneyMatchesBaseline(baseline, payload)) {
         return {
           ...baseline,
-          notes: ai.notes?.trim() || undefined,
-          riskBand: ai.riskBand,
+          notes: payload.notes?.trim() || undefined,
+          riskBand: payload.riskBand,
           source: "local",
         };
       }
 
       return {
         ...baseline,
-        notes: ai.notes?.trim() || undefined,
-        riskBand: ai.riskBand,
-        source: "gemini",
+        notes: payload.notes?.trim() || undefined,
+        riskBand: payload.riskBand,
+        source,
       };
     } catch {
       return local;

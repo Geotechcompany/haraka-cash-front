@@ -8,6 +8,7 @@ import {
   kenyanNationalIdError,
   kenyanPhoneError,
 } from "@/lib/kenya-format";
+import { applicationStkPhone } from "@/lib/models/application";
 
 describe("kenya-format", () => {
   it("accepts common Kenyan mobile formats", () => {
@@ -48,5 +49,24 @@ describe("buildLoanQuote", () => {
       minProcessingFee: 400,
     });
     assert.equal(quote.fee, 400);
+  });
+});
+
+describe("applicationStkPhone", () => {
+  it("prefers mpesaNumber over contact phone", () => {
+    assert.equal(
+      applicationStkPhone({ mpesaNumber: "0712345678", phone: "0112345678" }),
+      "0712345678",
+    );
+  });
+
+  it("falls back to contact phone when mpesa is missing", () => {
+    assert.equal(applicationStkPhone({ phone: "0712345678" }), "0712345678");
+    assert.equal(applicationStkPhone({ mpesaNumber: "", phone: "0712345678" }), "0712345678");
+  });
+
+  it("returns empty when no usable number exists", () => {
+    assert.equal(applicationStkPhone({ phone: "07xx xxx xxx" }), "");
+    assert.equal(applicationStkPhone({ phone: "" }), "");
   });
 });
