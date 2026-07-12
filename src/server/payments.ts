@@ -106,7 +106,13 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
     await db.collection<PaymentRecord>("payments").insertOne(payment);
 
     if (provider.status === "success") {
-      await markApplicationDisbursing(application.applicationNumber);
+      await markApplicationUnderReview(application.applicationNumber);
+      return {
+        reference,
+        status: provider.status,
+        message:
+          "Fee received. Your application is with our team for CRB (credit bureau) checks.",
+      };
     }
 
     return {
@@ -183,6 +189,39 @@ export const getPaymentStatus = createServerFn({ method: "GET" })
     return { reference: payment.reference, status: payment.status };
   });
 
+/** After processing fee success: queue for team CRB checks (do not disburse). */
+export async function markApplicationUnderReview(applicationNumber: string) {
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  const application = await db
+    .collection<ApplicationRecord>("applications")
+    .findOne({ applicationNumber });
+  if (!application) throw new Error("Application not found");
+
+  if (application.status === "UnderReview" || application.status === "Disbursing") {
+    return;
+  }
+
+  await db
+    .collection<ApplicationRecord>("applications")
+    .updateOne(
+      { applicationNumber },
+      { $set: { status: "UnderReview", updatedAt: new Date() } },
+    );
+
+  if (application.clerkUserId) {
+    await db.collection("notifications").insertOne({
+      clerkUserId: application.clerkUserId,
+      title: "Processing fee received",
+      body: `Your processing fee for ${applicationNumber} was received. Your application is with our team for CRB (credit bureau) checks. We will notify you once the review is complete.`,
+      type: "info",
+      unread: true,
+      createdAt: new Date(),
+    });
+  }
+}
+
+/** After team CRB clearance: start disbursement and create the loan record. */
 export async function markApplicationDisbursing(applicationNumber: string) {
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
@@ -200,8 +239,8 @@ export async function markApplicationDisbursing(applicationNumber: string) {
   if (application.clerkUserId && application.status !== "Disbursing") {
     await db.collection("notifications").insertOne({
       clerkUserId: application.clerkUserId,
-      title: "Processing fee received",
-      body: `Your processing fee for ${applicationNumber} was received. Disbursement is in progress.`,
+      title: "Disbursement in progress",
+      body: `CRB review for ${applicationNumber} is complete. Your loan is being disbursed to M-Pesa.`,
       type: "success",
       unread: true,
       createdAt: new Date(),

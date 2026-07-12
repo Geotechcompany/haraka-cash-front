@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Search, Plus, CheckCircle2, Clock, XCircle, ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -24,90 +24,164 @@ const statusStyles: Record<string, string> = {
   Disbursing: "bg-primary-soft text-primary border-primary/20",
 };
 
+const springEnter = { type: "spring" as const, bounce: 0, duration: 0.35 };
+const STAGGER = 0.045;
+
 function LoansPage() {
   const applications = Route.useLoaderData();
+  const reduceMotion = useReducedMotion();
   const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
-  const filtered = applications.filter((a) =>
-    (tab === "all" || a.status.toLowerCase() === tab) &&
-    (a.id.toLowerCase().includes(q.toLowerCase()) || a.purpose.toLowerCase().includes(q.toLowerCase()))
+  const filtered = applications.filter(
+    (a) =>
+      (tab === "all" || a.status.toLowerCase() === tab) &&
+      (a.id.toLowerCase().includes(q.toLowerCase()) ||
+        a.purpose.toLowerCase().includes(q.toLowerCase())),
   );
 
   return (
     <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My loans</h1>
-          <p className="mt-1 text-muted-foreground">Track applications, offers and repayments.</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight">My loans</h1>
+          <p className="mt-1 text-muted-foreground">Applications, offers, and repayments.</p>
         </div>
-        <Button asChild className="rounded-xl h-11 gradient-brand text-white shadow-soft"><Link to="/apply"><Plus className="mr-1 h-4 w-4" /> New loan</Link></Button>
+        <Button asChild className="h-11 rounded-xl gradient-brand text-white shadow-soft">
+          <Link to="/apply">
+            <Plus className="mr-1 h-4 w-4" /> New loan
+          </Link>
+        </Button>
       </div>
 
       {activeLoan && (
-        <div className="card-soft p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <motion.div
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? { duration: 0.2 } : springEnter}
+          className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-soft md:p-6"
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Active loan</p>
-              <p className="text-2xl font-bold tabular-nums">{kes(activeLoan.amount)}</p>
+              <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+                Active loan
+              </p>
+              <p className="mt-1 font-display text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
+                {kes(activeLoan.amount)}
+              </p>
             </div>
-            <span className="text-xs font-semibold text-primary bg-primary-soft rounded-full px-3 py-1">{activeLoan.status}</span>
+            <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
+              {activeLoan.status}
+            </span>
           </div>
-          <ol className="grid sm:grid-cols-4 gap-3">
+          <ol className="grid gap-2 sm:grid-cols-4 sm:gap-3">
             {[
-              { l: "Pending Review", done: true, icon: CheckCircle2 },
+              { l: "Pending review", done: true, icon: CheckCircle2 },
               { l: "Approved", done: activeLoan.status !== "Pending", icon: CheckCircle2 },
-              { l: "Disbursed", done: activeLoan.status === "Disbursing" || activeLoan.status === "Approved", icon: CheckCircle2 },
+              {
+                l: "Disbursed",
+                done: activeLoan.status === "Disbursing" || activeLoan.status === "Approved",
+                icon: CheckCircle2,
+              },
               { l: "Repayment", done: false, icon: Clock },
-            ].map((s, i) => (
-              <li key={i} className={cn("rounded-xl border p-3", s.done ? "bg-success/5 border-success/30" : "bg-muted/30")}>
-                <s.icon className={cn("h-4 w-4", s.done ? "text-success" : "text-muted-foreground")} />
-                <p className="mt-2 text-xs font-semibold">{s.l}</p>
+            ].map((step) => (
+              <li
+                key={step.l}
+                className={cn(
+                  "rounded-xl border p-3",
+                  step.done ? "border-success/30 bg-success/5" : "bg-muted/30",
+                )}
+              >
+                <step.icon
+                  className={cn("h-4 w-4", step.done ? "text-success" : "text-muted-foreground")}
+                />
+                <p className="mt-2 text-xs font-semibold">{step.l}</p>
               </li>
             ))}
           </ol>
-        </div>
+        </motion.div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search loans" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9 h-11 rounded-xl" />
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by ID or purpose"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="h-11 rounded-xl pl-9"
+          />
         </div>
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="rounded-xl h-11">
-            <TabsTrigger value="all" className="rounded-lg">All</TabsTrigger>
-            <TabsTrigger value="pending" className="rounded-lg">Pending</TabsTrigger>
-            <TabsTrigger value="approved" className="rounded-lg">Approved</TabsTrigger>
-            <TabsTrigger value="completed" className="rounded-lg">Completed</TabsTrigger>
+          <TabsList className="h-11 rounded-xl">
+            <TabsTrigger value="all" className="rounded-lg">
+              All
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="rounded-lg">
+              Pending
+            </TabsTrigger>
+            <TabsTrigger value="approved" className="rounded-lg">
+              Approved
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="rounded-lg">
+              Completed
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2.5">
         {filtered.map((a, i) => (
-          <motion.div key={a.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-            className="card-soft p-5 flex flex-wrap md:flex-nowrap items-center gap-4 hover:shadow-elevated transition-shadow">
-            <div className="h-11 w-11 shrink-0 rounded-xl bg-primary-soft text-primary grid place-items-center font-semibold text-sm">{a.id.slice(-3)}</div>
+          <motion.div
+            key={a.id}
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={
+              reduceMotion
+                ? { duration: 0.15, delay: i * STAGGER }
+                : { ...springEnter, delay: i * STAGGER }
+            }
+            className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-soft transition-[box-shadow] duration-200 ease-[var(--ease-out)] hover:shadow-elevated md:flex-nowrap md:p-5"
+          >
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-sm font-semibold text-primary">
+              {a.id.slice(-3)}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold truncate">{a.id}</p>
-                <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full border", statusStyles[a.status])}>{a.status}</span>
+                <p className="truncate font-semibold">{a.purpose}</p>
+                <span
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                    statusStyles[a.status],
+                  )}
+                >
+                  {a.status}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{a.purpose} · {a.months} mo · {new Date(a.createdAt).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {a.id} · {a.months} mo ·{" "}
+                {new Date(a.createdAt).toLocaleDateString("en-KE", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </p>
             </div>
             <div className="text-right">
-              <p className="font-semibold tabular-nums">{kes(a.amount)}</p>
+              <p className="font-semibold tracking-tight tabular-nums">{kes(a.amount)}</p>
               <p className="text-xs text-muted-foreground">Score {a.eligibilityScore}</p>
             </div>
-            <Button variant="ghost" size="sm" className="rounded-lg">Details <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="rounded-lg">
+              Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
           </motion.div>
         ))}
         {filtered.length === 0 && (
-          <div className="text-center py-16">
-            <div className="mx-auto h-16 w-16 rounded-2xl bg-muted grid place-items-center"><XCircle className="h-8 w-8 text-muted-foreground" /></div>
-            <p className="mt-4 font-semibold">No loans found</p>
-            <p className="text-sm text-muted-foreground">Try a different filter or search term.</p>
+          <div className="py-16 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-muted">
+              <XCircle className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <p className="mt-4 font-semibold">No loans match</p>
+            <p className="text-sm text-muted-foreground">Try another filter or search term.</p>
           </div>
         )}
       </div>

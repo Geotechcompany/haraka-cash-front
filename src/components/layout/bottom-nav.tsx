@@ -3,6 +3,7 @@ import { Home, Wallet, PlusCircle, Bell, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NavItem = { to: string; label: string; icon: typeof Home; primary?: boolean };
+
 const items: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/loans", label: "Loans", icon: Wallet },
@@ -13,40 +14,43 @@ const items: NavItem[] = [
 
 export function BottomNav() {
   const path = useRouterState({ select: (s) => s.location.pathname });
+
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 md:hidden glass border-t"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 glass md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Primary"
     >
-      <ul className="grid grid-cols-5 max-w-md mx-auto px-2 pt-2 pb-2">
-        {items.map((it) => {
-          const active = path === it.to;
-          const Icon = it.icon;
-          if (it.primary) {
+      <ul className="mx-auto grid max-w-md grid-cols-5 px-2 pb-2 pt-1.5">
+        {items.map((item) => {
+          const active = path === item.to;
+          const Icon = item.icon;
+
+          if (item.primary) {
             return (
-              <li key={it.to} className="flex justify-center">
+              <li key={item.to} className="flex justify-center">
                 <Link
-                  to={it.to}
-                  aria-label={it.label}
-                  className="grid place-items-center h-14 w-14 -mt-6 rounded-2xl gradient-brand text-white shadow-elevated hover:scale-105 active:scale-95 transition"
+                  to={item.to}
+                  aria-label={item.label}
+                  className="grid h-14 w-14 -mt-5 place-items-center rounded-2xl gradient-brand text-white shadow-elevated transition-[transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97]"
                 >
                   <Icon className="h-6 w-6" />
                 </Link>
               </li>
             );
           }
+
           return (
-            <li key={it.to}>
+            <li key={item.to}>
               <Link
-                to={it.to}
+                to={item.to}
                 className={cn(
-                  "flex flex-col items-center gap-1 py-1.5 text-[11px] font-medium min-h-11",
+                  "flex min-h-11 flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition-[color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97]",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
-                <Icon className="h-[20px] w-[20px]" />
-                <span>{it.label}</span>
+                <Icon className={cn("h-5 w-5", active && "stroke-[2.25]")} />
+                <span>{item.label}</span>
               </Link>
             </li>
           );

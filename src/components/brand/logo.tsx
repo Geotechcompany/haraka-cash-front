@@ -5,15 +5,21 @@ export function Logo({
   className,
   to = "/",
   height = 48,
-  variant = "color",
+  variant,
 }: {
   className?: string;
   to?: string;
   height?: number;
-  /** `white` for dark / brand-gradient surfaces */
+  /**
+   * `white` — always white (dark brand panels in either theme).
+   * `color` — always color.
+   * omit — color in light mode, white when `html` has `dark`.
+   */
   variant?: "color" | "white";
 }) {
-  const src = variant === "white" ? "/logo-white.png" : "/logo.png";
+  const width = Math.round(height * 3.5);
+  const imgClass =
+    "w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]";
 
   return (
     <Link
@@ -21,14 +27,45 @@ export function Logo({
       className={cn("inline-flex items-center group", className)}
       aria-label="HarakaCash home"
     >
-      <img
-        src={src}
-        alt="Haraka Cash"
-        height={height}
-        width={Math.round(height * 3.5)}
-        className="w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]"
-        style={{ height }}
-      />
+      {variant === "white" ? (
+        <img
+          src="/logo-white.png"
+          alt="Haraka Cash"
+          height={height}
+          width={width}
+          className={imgClass}
+          style={{ height }}
+        />
+      ) : variant === "color" ? (
+        <img
+          src="/logo.png"
+          alt="Haraka Cash"
+          height={height}
+          width={width}
+          className={imgClass}
+          style={{ height }}
+        />
+      ) : (
+        <>
+          <img
+            src="/logo.png"
+            alt="Haraka Cash"
+            height={height}
+            width={width}
+            className={cn(imgClass, "dark:hidden")}
+            style={{ height }}
+          />
+          <img
+            src="/logo-white.png"
+            alt=""
+            aria-hidden
+            height={height}
+            width={width}
+            className={cn(imgClass, "hidden dark:block")}
+            style={{ height }}
+          />
+        </>
+      )}
     </Link>
   );
 }

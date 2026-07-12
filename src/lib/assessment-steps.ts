@@ -5,7 +5,7 @@ export const ASSESSMENT_STEPS = [
   "Income Assessment",
   "Existing Loans Check",
   "Repayment Behaviour",
-  "Credit Assessment Simulation",
+  "Credit Assessment",
   "Risk Indicators",
   "Internal Rules Engine",
   "Calculating Score",

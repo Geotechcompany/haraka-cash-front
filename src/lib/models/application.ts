@@ -1,5 +1,18 @@
 export type ApplicationStatus =
-  "Pending" | "Approved" | "Declined" | "Completed" | "Disbursing" | "DocumentsRequired";
+  | "Pending"
+  | "Approved"
+  | "Declined"
+  | "Completed"
+  | "Disbursing"
+  | "DocumentsRequired"
+  | "UnderReview";
+
+/** User-facing label for application status badges. */
+export function applicationStatusLabel(status: ApplicationStatus | string): string {
+  if (status === "UnderReview") return "Under review";
+  if (status === "DocumentsRequired") return "Documents required";
+  return status;
+}
 
 export type ApplicationRecord = {
   _id?: string;

@@ -1,11 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
-  Wallet, TrendingUp, Clock, ArrowRight, Plus, CheckCircle2, AlertCircle, FileText,
+  TrendingUp,
+  ArrowRight,
+  Plus,
+  FileText,
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  CartesianGrid,
+} from "recharts";
 import { AppShell } from "@/components/layout/app-shell";
-import { StatCard } from "@/components/ui-extras/stat-card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -38,182 +50,377 @@ const statusStyles: Record<string, string> = {
   Disbursing: "bg-primary-soft text-primary border-primary/20",
 };
 
+const springEnter = { type: "spring" as const, bounce: 0, duration: 0.4 };
+const STAGGER_MS = 0.05;
+
+function greetingForHour(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 function Dashboard() {
   const { user, applications, notifications, loanHistory, stats } = Route.useLoaderData();
+  const reduceMotion = useReducedMotion();
   const recent = applications.slice(0, 5);
   const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
+  const unread = notifications.filter((n) => n.unread).length;
+  const profilePct = user?.profileComplete ?? 0;
+  const score = user?.eligibilityScore ?? 0;
+  const greeting = greetingForHour(new Date().getHours());
+
+  const enter = (delay = 0) =>
+    reduceMotion
+      ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2, delay } }
+      : {
+          initial: { opacity: 0, y: 10 },
+          animate: { opacity: 1, y: 0 },
+          transition: { ...springEnter, delay },
+        };
+
+  const heroMotion = enter(0);
+  const sideMotion = enter(STAGGER_MS);
+  const stripMotion = enter(STAGGER_MS * 2);
+
   return (
     <AppShell>
-      {/* Welcome */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 rounded-3xl gradient-brand text-white p-6 md:p-8 shadow-elevated relative overflow-hidden">
-          <div className="absolute -top-20 -right-16 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden />
-          <p className="text-sm opacity-80">Good morning,</p>
-          <h1 className="text-2xl md:text-3xl font-bold mt-1">{user?.name ?? "HarakaCash user"}</h1>
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-xs uppercase tracking-wide opacity-70">Available credit</p>
-              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">{kes(user?.availableCredit ?? 0)}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide opacity-70">Eligibility score</p>
-              <p className="text-3xl md:text-4xl font-bold mt-1 tabular-nums">{user?.eligibilityScore ?? 0}<span className="text-lg opacity-70">/100</span></p>
-            </div>
-          </div>
-          <div className="mt-4 h-1.5 rounded-full bg-white/25 overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${user?.eligibilityScore ?? 0}%` }} transition={{ delay: 0.3, duration: 1 }} className="h-full bg-white" />
-          </div>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Button asChild size="lg" className="rounded-xl bg-white text-primary hover:bg-white/90 font-semibold">
-              <Link to="/apply"><Plus className="mr-1 h-4 w-4" /> Apply for loan</Link>
-            </Button>
-            <Button asChild size="lg" variant="ghost" className="rounded-xl text-white hover:bg-white/10">
-              <Link to="/loans">View loans <ArrowRight className="ml-1 h-4 w-4" /></Link>
-            </Button>
-          </div>
-        </motion.div>
+      {/* Primary composition: credit + next action */}
+      <div className="grid gap-4 lg:grid-cols-5 lg:gap-5">
+        <motion.section
+          {...heroMotion}
+          className="relative overflow-hidden rounded-3xl gradient-brand p-6 text-white shadow-elevated md:p-8 lg:col-span-3"
+        >
+          <div
+            className="pointer-events-none absolute -top-24 -right-20 h-72 w-72 rounded-full bg-white/10 blur-3xl"
+            aria-hidden
+          />
+          <p className="text-sm text-white/75">
+            {greeting},{" "}
+            <span className="font-medium text-white">{user?.name?.split(" ")[0] ?? "there"}</span>
+          </p>
+          <p className="mt-6 text-[11px] font-semibold tracking-[0.14em] text-white/65 uppercase">
+            Available credit
+          </p>
+          <p className="mt-1 font-display text-4xl font-bold tracking-tight tabular-nums md:text-5xl">
+            {kes(user?.availableCredit ?? 0)}
+          </p>
 
-        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card-soft p-6">
-          {activeLoan ? (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="font-semibold">Current loan</p>
-                <Badge variant="secondary" className="rounded-full">{activeLoan.status}</Badge>
+          <div className="mt-6 max-w-sm">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs text-white/70">Eligibility score</p>
+              <p className="text-sm font-semibold tabular-nums">
+                {score}
+                <span className="text-white/60">/100</span>
+              </p>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/25">
+              <motion.div
+                className="h-full origin-left bg-white"
+                initial={reduceMotion ? { opacity: 0.4 } : { scaleX: 0 }}
+                animate={reduceMotion ? { opacity: 1 } : { scaleX: 1 }}
+                transition={
+                  reduceMotion
+                    ? { duration: 0.2 }
+                    : { type: "spring", bounce: 0, duration: 0.55, delay: 0.12 }
+                }
+                style={reduceMotion ? { width: `${score}%` } : { width: `${score}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-2">
+            <Button
+              asChild
+              size="lg"
+              className="rounded-xl bg-white font-semibold text-primary hover:bg-white/90"
+            >
+              <Link to="/apply">
+                <Plus className="mr-1 h-4 w-4" /> Apply for a loan
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="ghost"
+              className="rounded-xl text-white hover:bg-white/10"
+            >
+              <Link to="/loans">
+                My loans <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </motion.section>
+
+        <motion.aside {...sideMotion} className="flex flex-col gap-4 lg:col-span-2">
+          <div className="card-soft flex flex-1 flex-col p-5 md:p-6">
+            {activeLoan ? (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    Current loan
+                  </p>
+                  <Badge variant="secondary" className="rounded-full">
+                    {activeLoan.status}
+                  </Badge>
+                </div>
+                <p className="mt-3 font-display text-3xl font-bold tracking-tight tabular-nums">
+                  {kes(activeLoan.amount)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activeLoan.months}-month term · {activeLoan.purpose}
+                </p>
+                <Button asChild variant="outline" className="mt-auto rounded-xl">
+                  <Link to="/loans">View loan</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                  Current loan
+                </p>
+                <p className="mt-3 text-lg font-semibold tracking-tight">None active</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  When you take a loan, balance and status show here.
+                </p>
+                <Button asChild className="mt-auto rounded-xl gradient-brand text-white">
+                  <Link to="/apply">
+                    <Plus className="mr-1 h-4 w-4" /> Apply now
+                  </Link>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {profilePct < 100 && (
+            <div className="card-soft p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold tracking-tight">Finish your profile</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Higher limits unlock as details are complete.
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+                  {profilePct}%
+                </span>
               </div>
-              <p className="text-3xl font-bold mt-3 tabular-nums">{kes(activeLoan.amount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{activeLoan.months} month term · {activeLoan.purpose}</p>
-              <Button asChild variant="outline" className="mt-4 w-full rounded-xl">
-                <Link to="/loans">View loan</Link>
+              <Progress value={profilePct} className="mt-3 h-1.5" />
+              <Button asChild variant="ghost" size="sm" className="mt-2 -ml-2 rounded-lg">
+                <Link to="/profile">
+                  Continue <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </Link>
               </Button>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold">No active loan</p>
-              <p className="text-sm text-muted-foreground mt-2">Apply for a loan to see your current balance here.</p>
-              <Button asChild className="mt-4 w-full rounded-xl gradient-brand text-white">
-                <Link to="/apply"><Plus className="mr-1 h-4 w-4" /> Apply now</Link>
-              </Button>
-            </>
+            </div>
           )}
-        </motion.div>
+        </motion.aside>
       </div>
 
-      {/* Stat cards */}
-      <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending" value={String(stats.pending)} icon={Clock} tone="warning" delay={0} />
-        <StatCard label="Approved" value={String(stats.approved)} icon={CheckCircle2} tone="success" delay={0.05} />
-        <StatCard label="Completed" value={String(stats.completed)} icon={Wallet} tone="primary" delay={0.1} />
-        <StatCard label="Declined" value={String(stats.declined)} icon={AlertCircle} tone="danger" delay={0.15} />
+      {/* Compact pipeline — one surface, not four cards */}
+      <motion.div
+        {...stripMotion}
+        className="mt-5 grid grid-cols-2 divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:grid-cols-4 sm:divide-x"
+      >
+        {[
+          { label: "Pending", value: stats.pending },
+          { label: "Approved", value: stats.approved },
+          { label: "Completed", value: stats.completed },
+          { label: "Declined", value: stats.declined },
+        ].map((item, i) => (
+          <div
+            key={item.label}
+            className={cn(
+              "px-4 py-3.5 sm:px-5",
+              i < 2 && "border-b border-border sm:border-b-0",
+            )}
+          >
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              {item.label}
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tracking-tight tabular-nums">{item.value}</p>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Activity */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-5 lg:gap-5">
+        <motion.section
+          {...enter(STAGGER_MS * 3)}
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:col-span-3"
+        >
+          <div className="flex items-center justify-between gap-3 px-5 py-4 md:px-6">
+            <div>
+              <h2 className="font-semibold tracking-tight">Recent applications</h2>
+              <p className="text-xs text-muted-foreground">Your latest loan requests</p>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="rounded-lg">
+              <Link to="/loans">View all</Link>
+            </Button>
+          </div>
+          <ul className="divide-y divide-border">
+            {recent.length === 0 ? (
+              <li className="px-5 py-10 text-center text-sm text-muted-foreground md:px-6">
+                No applications yet.{" "}
+                <Link to="/apply" className="font-medium text-primary hover:underline">
+                  Apply for a loan
+                </Link>
+              </li>
+            ) : (
+              recent.map((app, i) => (
+                <motion.li
+                  key={app.id}
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0.15, delay: 0.15 + i * STAGGER_MS }
+                      : { ...springEnter, delay: 0.15 + i * STAGGER_MS }
+                  }
+                  className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-150 ease-[var(--ease-out)] hover:bg-muted/40 md:gap-4 md:px-6"
+                >
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{app.purpose}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(app.createdAt).toLocaleDateString("en-KE", {
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · {app.months} mo · {app.id}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold tabular-nums">{kes(app.amount)}</p>
+                    <span
+                      className={cn(
+                        "mt-0.5 inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        statusStyles[app.status],
+                      )}
+                    >
+                      {app.status}
+                    </span>
+                  </div>
+                </motion.li>
+              ))
+            )}
+          </ul>
+        </motion.section>
+
+        <motion.section
+          {...enter(STAGGER_MS * 4)}
+          className="rounded-2xl border border-border bg-card p-5 shadow-soft md:p-6 lg:col-span-2"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold tracking-tight">Alerts</h2>
+              <p className="text-xs text-muted-foreground">
+                {unread > 0 ? `${unread} unread` : "All caught up"}
+              </p>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="rounded-lg">
+              <Link to="/notifications">All</Link>
+            </Button>
+          </div>
+          <ul className="mt-4 space-y-3">
+            {notifications.slice(0, 4).map((n, i) => (
+              <motion.li
+                key={n.id}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                transition={
+                  reduceMotion
+                    ? { duration: 0.15, delay: 0.2 + i * STAGGER_MS }
+                    : { ...springEnter, delay: 0.2 + i * STAGGER_MS }
+                }
+                className="flex gap-3"
+              >
+                <div
+                  className={cn(
+                    "mt-2 h-1.5 w-1.5 shrink-0 rounded-full",
+                    n.unread ? "bg-primary" : "bg-muted-foreground/30",
+                  )}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{n.title}</p>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">{n.time}</p>
+                </div>
+              </motion.li>
+            ))}
+            {notifications.length === 0 && (
+              <li className="py-6 text-center text-sm text-muted-foreground">No alerts yet</li>
+            )}
+          </ul>
+        </motion.section>
       </div>
 
-      {/* Charts */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="card-soft p-6">
+      {/* Charts — secondary, denser */}
+      <motion.div
+        {...enter(STAGGER_MS * 5)}
+        className="mt-6 grid gap-4 lg:grid-cols-2 lg:gap-5"
+      >
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold">Monthly borrowing</p>
+              <h2 className="font-semibold tracking-tight">Monthly borrowing</h2>
               <p className="text-xs text-muted-foreground">Last 6 months</p>
             </div>
-            <TrendingUp className="h-4 w-4 text-success" />
+            <TrendingUp className="h-4 w-4 text-success" aria-hidden />
           </div>
-          <div className="mt-4 h-56">
+          <div className="mt-3 h-48 md:h-56">
             <ResponsiveContainer>
               <AreaChart data={loanHistory}>
                 <defs>
-                  <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.4} />
+                  <linearGradient id="dashBorrow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
                     <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs" />
                 <YAxis hide />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--color-border)", background: "var(--color-card)" }} />
-                <Area type="monotone" dataKey="borrowed" stroke="var(--color-primary)" strokeWidth={2.5} fill="url(#g1)" />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-card)",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="borrowed"
+                  stroke="var(--color-primary)"
+                  strokeWidth={2.5}
+                  fill="url(#dashBorrow)"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="card-soft p-6">
-          <p className="font-semibold">Repayment behaviour</p>
-          <p className="text-xs text-muted-foreground">Borrowed vs repaid</p>
-          <div className="mt-4 h-56">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft md:p-6">
+          <h2 className="font-semibold tracking-tight">Borrowed vs repaid</h2>
+          <p className="text-xs text-muted-foreground">Repayment behaviour</p>
+          <div className="mt-3 h-48 md:h-56">
             <ResponsiveContainer>
               <BarChart data={loanHistory}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} className="text-xs" />
                 <YAxis hide />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--color-border)", background: "var(--color-card)" }} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-card)",
+                  }}
+                />
                 <Bar dataKey="borrowed" fill="var(--color-primary)" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="repaid" fill="var(--color-chart-3)" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
-
-      {/* Recent + notifications */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 card-soft overflow-hidden">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <p className="font-semibold">Recent applications</p>
-              <p className="text-xs text-muted-foreground">Your latest loan requests</p>
-            </div>
-            <Button asChild variant="ghost" size="sm"><Link to="/loans">View all</Link></Button>
-          </div>
-          <div className="divide-y">
-            {recent.map((a) => (
-              <div key={a.id} className="px-6 py-4 flex items-center gap-4 hover:bg-muted/40 transition-colors">
-                <div className="h-10 w-10 shrink-0 rounded-xl bg-primary-soft text-primary grid place-items-center">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold truncate">{a.id} · {a.purpose}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleDateString("en-KE", { day: "numeric", month: "short" })} · {a.months}mo</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold tabular-nums">{kes(a.amount)}</p>
-                  <span className={cn("inline-block mt-0.5 text-[10px] font-medium px-2 py-0.5 rounded-full border", statusStyles[a.status])}>{a.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card-soft p-6">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold">Notifications</p>
-            <Button asChild variant="ghost" size="sm"><Link to="/notifications">All</Link></Button>
-          </div>
-          <ul className="mt-3 space-y-3">
-            {notifications.slice(0, 4).map((n) => (
-              <li key={n.id} className="flex gap-3">
-                <div className={cn("h-2 w-2 rounded-full mt-2 shrink-0", n.unread ? "bg-primary" : "bg-muted")} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{n.title}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{n.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Profile completion */}
-      <div className="mt-6 card-soft p-6 flex flex-col md:flex-row items-start md:items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold">Complete your profile</p>
-          <p className="text-sm text-muted-foreground">Complete your profile to unlock higher loan limits.</p>
-          <div className="mt-3">
-            <Progress value={user?.profileComplete ?? 0} className="h-2" />
-          </div>
-        </div>
-        <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
-          <Link to="/profile">Finish setup</Link>
-        </Button>
-      </div>
+      </motion.div>
     </AppShell>
   );
 }

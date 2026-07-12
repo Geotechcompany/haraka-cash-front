@@ -31,7 +31,7 @@ export function AuthLayout({
             <div className="mt-8">{children}</div>
             {footer && <div className="mt-6 text-sm text-foreground/70">{footer}</div>}
             <p className="mt-10 text-xs text-foreground/60">
-              By continuing you agree to our <Link to="/" className="underline">Terms</Link> and <Link to="/" className="underline">Privacy Policy</Link>.
+              By continuing you agree to our <Link to="/terms" className="underline">Terms</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.
             </p>
           </div>
         </div>

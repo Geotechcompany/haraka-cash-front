@@ -39,8 +39,9 @@ export const getDashboardStats = createServerFn({ method: "GET" }).handler(async
 
   for (const app of applications) {
     const status = String(app.status).toLowerCase();
-    if (status === "pending" || status === "disbursing") counts.pending += 1;
-    else if (status === "approved") counts.approved += 1;
+    if (status === "pending" || status === "underreview" || status === "documentsrequired") {
+      counts.pending += 1;
+    } else if (status === "approved" || status === "disbursing") counts.approved += 1;
     else if (status === "completed") counts.completed += 1;
     else if (status === "declined") counts.declined += 1;
   }

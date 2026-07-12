@@ -27,10 +27,10 @@ export const Route = createFileRoute("/settings")({
     return (
       <AppShell>
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-1 text-muted-foreground">Personalize your HarakaCash experience.</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="mt-1 text-muted-foreground">Theme, language, and account controls.</p>
 
-          <div className="card-soft divide-y mt-6">
+          <div className="mt-6 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
             <Row icon={Moon} title="Dark mode" desc="Switch between light and dark themes">
               <Switch checked={theme === "dark"} onCheckedChange={toggle} />
             </Row>

@@ -33,14 +33,6 @@ const steps = [
   { title: "Get paid", body: "Funds land on your M-Pesa after you accept." },
 ];
 
-const feeRows = [
-  [5000, 150],
-  [10000, 250],
-  [20000, 500],
-  [50000, 1000],
-  [100000, 2000],
-] as const;
-
 const faqs = [
   {
     q: "How much can I borrow?",
@@ -52,7 +44,7 @@ const faqs = [
   },
   {
     q: "What are the fees?",
-    a: "One processing fee, shown before you accept. Example: KES 150 on a KES 5,000 loan; KES 2,000 on a KES 100,000 loan.",
+    a: "You pay one processing fee, shown on your offer before you accept. Principal and interest are listed there too. Nothing else is added at payout.",
   },
   {
     q: "Do you pull a credit bureau file?",
@@ -78,9 +70,6 @@ function Landing() {
           <nav className="ml-8 hidden items-center gap-1 text-sm md:flex" aria-label="Primary">
             <a href="#how" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
               How it works
-            </a>
-            <a href="#fees" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
-              Fees
             </a>
             <a href="#faq" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
               FAQ
@@ -245,7 +234,7 @@ function Landing() {
           </p>
         </motion.div>
 
-            <ol className="mt-14 grid gap-10 sm:grid-cols-3 lg:gap-8">
+        <ol className="mt-14 grid gap-10 sm:grid-cols-3 lg:gap-8">
           {steps.map((step, index) => (
             <motion.li
               key={step.title}
@@ -263,63 +252,37 @@ function Landing() {
             </motion.li>
           ))}
         </ol>
+
+        <motion.div
+          initial={reduceMotion ? false : { y: 10 }}
+          whileInView={{ y: 0 }}
+          viewport={{ once: true, margin: "-40px" }}
+          transition={springEnter}
+          className="mt-12"
+        >
+          <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
+            <Link to="/register">
+              Check your offer <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </motion.div>
       </section>
 
-      <section id="fees" className="border-y bg-muted/35">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:items-end lg:px-8 lg:py-28">
-          <motion.div
+      <section className="border-y bg-muted/35">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <motion.blockquote
             initial={reduceMotion ? false : { y: 12 }}
             whileInView={{ y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
             transition={springEnter}
+            className="mx-auto max-w-3xl"
           >
-            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              One fee. Shown before you tap accept.
-            </h2>
-            <p className="mt-3 max-w-md text-muted-foreground">
-              Principal, interest, and processing fee appear in the offer screen. Nothing else gets added at payout.
+            <p className="font-display text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">
+              “Stock money hit my M-Pesa in under five minutes. What I saw on the offer is what I paid.”
             </p>
-            <Button asChild className="mt-8 rounded-xl gradient-brand text-white shadow-soft">
-              <Link to="/register">
-                Check your offer <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </motion.div>
-
-          <div className="overflow-hidden rounded-2xl border bg-card shadow-soft">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/70 text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-3.5 text-left font-medium">Loan amount</th>
-                  <th className="px-5 py-3.5 text-right font-medium">Processing fee</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {feeRows.map(([amount, fee]) => (
-                  <tr key={amount} className="tabular-nums">
-                    <td className="px-5 py-4 font-medium">{kes(amount)}</td>
-                    <td className="px-5 py-4 text-right">{kes(fee)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <footer className="mt-6 text-sm text-muted-foreground">Shop owner · Nairobi</footer>
+          </motion.blockquote>
         </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-        <motion.blockquote
-          initial={reduceMotion ? false : { y: 12 }}
-          whileInView={{ y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={springEnter}
-          className="mx-auto max-w-3xl"
-        >
-          <p className="font-display text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">
-            “Stock money hit my M-Pesa in under five minutes. The fee matched what the screen showed.”
-          </p>
-          <footer className="mt-6 text-sm text-muted-foreground">Shop owner · Nairobi</footer>
-        </motion.blockquote>
       </section>
 
       <section id="faq" className="border-t bg-muted/25">
@@ -364,7 +327,7 @@ function Landing() {
             Borrow what you need. Repay on your schedule.
           </h2>
           <p className="mt-3 max-w-lg text-white/85">
-            Open an account, submit one application, and decide with the fee in plain view.
+            Open an account, submit one application, and review your offer before you accept.
           </p>
           <Button asChild size="lg" className="mt-8 h-12 rounded-xl bg-white px-6 text-base font-semibold text-[oklch(0.35_0.16_258)] hover:bg-white/95">
             <Link to="/register">
@@ -379,14 +342,14 @@ function Landing() {
           <div>
             <Logo height={52} className="max-w-[260px]" />
             <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-              Digital loans for Kenya, with M-Pesa payout and fees you can read before you accept.
+              Digital loans for Kenya, with M-Pesa payout and an offer you can read before you accept.
             </p>
           </div>
           {(
             [
-              { heading: "Product", links: [["Apply", "/register"], ["Dashboard", "/dashboard"], ["Fees", "#fees"]] },
+              { heading: "Product", links: [["Apply", "/register"], ["Dashboard", "/dashboard"], ["How it works", "#how"]] },
               { heading: "Help", links: [["FAQ", "#faq"], ["Support", "/support"], ["Sign in", "/login"]] },
-              { heading: "Legal", links: [["Terms", "#"], ["Privacy", "#"], ["Compliance", "#"]] },
+              { heading: "Legal", links: [["Terms", "/terms"], ["Privacy", "/privacy"], ["Compliance", "#"]] },
             ] as const
           ).map((column) => (
             <div key={column.heading}>

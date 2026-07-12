@@ -32,7 +32,11 @@ export const getAdminOverviewStats = createServerFn({ method: "GET" }).handler(a
             declined: { $sum: { $cond: [{ $eq: ["$status", "Declined"] }, 1, 0] } },
             pending: {
               $sum: {
-                $cond: [{ $in: ["$status", ["Pending", "DocumentsRequired"]] }, 1, 0],
+                $cond: [
+                  { $in: ["$status", ["Pending", "DocumentsRequired", "UnderReview"]] },
+                  1,
+                  0,
+                ],
               },
             },
             totalAmount: { $sum: "$amount" },

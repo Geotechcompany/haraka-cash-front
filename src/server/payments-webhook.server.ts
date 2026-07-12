@@ -37,8 +37,8 @@ export async function handleSmplyPayWebhook(payload: unknown) {
     payment.kind === "processing_fee" &&
     payment.applicationNumber
   ) {
-    const { markApplicationDisbursing } = await import("@/server/payments");
-    await markApplicationDisbursing(payment.applicationNumber);
+    const { markApplicationUnderReview } = await import("@/server/payments");
+    await markApplicationUnderReview(payment.applicationNumber);
   }
 
   if (

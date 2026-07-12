@@ -256,6 +256,7 @@ const updateStatusInput = z.object({
     "Completed",
     "Disbursing",
     "DocumentsRequired",
+    "UnderReview",
   ]),
 });
 
@@ -277,8 +278,36 @@ export const reviewApplication = createServerFn({ method: "POST" })
       .findOne({ applicationNumber: data.applicationNumber });
     if (!application) throw new Error("Application not found");
 
-    const status = applicationStatusForReview(data.action);
     const now = new Date();
+
+    // Fee paid + CRB queue: admin approve starts disbursement (does not re-open offer).
+    if (data.action === "approve" && application.status === "UnderReview") {
+      const { markApplicationDisbursing } = await import("@/server/payments");
+      await db.collection<ApplicationRecord>("applications").updateOne(
+        { applicationNumber: data.applicationNumber },
+        {
+          $set: {
+            reviewedBy: adminId,
+            reviewedAt: now,
+            reviewNotes: data.note,
+            requiredDocuments: [],
+            updatedAt: now,
+          },
+        },
+      );
+      await markApplicationDisbursing(data.applicationNumber);
+
+      const { logAuditEvent } = await import("@/server/internal/audit-events");
+      await logAuditEvent({
+        actor: adminId,
+        action: "Cleared CRB review and started disbursement",
+        target: data.applicationNumber,
+      });
+
+      return { ok: true, status: "Disbursing" as ApplicationStatus };
+    }
+
+    const status = applicationStatusForReview(data.action);
     const requiredDocuments =
       data.action === "requestDocuments"
         ? data.requiredDocuments?.length
@@ -305,7 +334,7 @@ export const reviewApplication = createServerFn({ method: "POST" })
         status === "Approved"
           ? {
               title: "Loan application approved",
-              body: `Your application ${data.applicationNumber} has been approved.`,
+              body: `Your application ${data.applicationNumber} has been approved. Pay the processing fee to continue.`,
               type: "success",
             }
           : status === "Declined"

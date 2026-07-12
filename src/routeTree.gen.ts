@@ -9,11 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OtpRouteImport } from './routes/otp'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as LoginRouteImport } from './routes/login'
@@ -39,6 +41,11 @@ import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as ApiWebhooksSmplyPayRouteImport } from './routes/api/webhooks/smply-pay'
 import { Route as ApiAdminReportsReportFormatRouteImport } from './routes/api/admin/reports/$report/$format'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -62,6 +69,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OtpRoute = OtpRouteImport.update({
@@ -199,11 +211,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/otp': typeof OtpRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -229,11 +243,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/otp': typeof OtpRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -261,11 +277,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
   '/otp': typeof OtpRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/applications': typeof AdminApplicationsRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -294,11 +312,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/notifications'
     | '/otp'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
     | '/support'
+    | '/terms'
     | '/admin/analytics'
     | '/admin/applications'
     | '/admin/audit'
@@ -324,11 +344,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/notifications'
     | '/otp'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
     | '/support'
+    | '/terms'
     | '/admin/analytics'
     | '/admin/applications'
     | '/admin/audit'
@@ -355,11 +377,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/notifications'
     | '/otp'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
     | '/support'
+    | '/terms'
     | '/admin/analytics'
     | '/admin/applications'
     | '/admin/audit'
@@ -387,17 +411,26 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NotificationsRoute: typeof NotificationsRoute
   OtpRoute: typeof OtpRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRoute
+  TermsRoute: typeof TermsRoute
   ApiWebhooksSmplyPayRoute: typeof ApiWebhooksSmplyPayRoute
   ApiAdminReportsReportFormatRoute: typeof ApiAdminReportsReportFormatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -431,6 +464,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/otp': {
@@ -645,11 +685,13 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NotificationsRoute: NotificationsRoute,
   OtpRoute: OtpRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRoute,
+  TermsRoute: TermsRoute,
   ApiWebhooksSmplyPayRoute: ApiWebhooksSmplyPayRoute,
   ApiAdminReportsReportFormatRoute: ApiAdminReportsReportFormatRoute,
 }
