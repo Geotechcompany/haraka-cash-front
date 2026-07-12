@@ -2,11 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE,
   buildLocalAssessmentSteps,
   clampApprovedAmount,
   clampAssessmentDecision,
+  computeAffordabilityCeiling,
+  computeDisposableIncome,
+  computeMaxAffordableMonthlyPayment,
   normalizeAssessmentSteps,
   PARTIAL_APPROVAL_RATIO,
+  resolveAffordableApprovedAmount,
   resolveLocalApprovedAmount,
   suggestPartialApprovedAmount,
 } from "@/lib/assessment-policy";
@@ -46,22 +51,95 @@ describe("normalizeAssessmentSteps", () => {
   });
 });
 
-describe("partial approval heuristic", () => {
-  it("rounds 67% of 20_000 to 13_400", () => {
+describe("affordability model", () => {
+  const quoteOpts = { months: 3, monthlyInterestRatePercent: 6 } as const;
+  const band = { minLoanAmount: 1_000, maxLoanAmount: 100_000 } as const;
+
+  /** Tight but viable: can service ~13.4k/mo payment, not full 20k. */
+  const tightProfile = {
+    monthlyIncome: 25_500,
+    monthlyExpenses: 8_000,
+    rentMortgage: 1_950,
+    existingLoans: 0,
+  };
+
+  const strongProfile = {
+    monthlyIncome: 300_000,
+    monthlyExpenses: 30_000,
+    rentMortgage: 0,
+    existingLoans: 0,
+  };
+
+  it("computes disposable income with rent and debt service", () => {
+    assert.equal(
+      computeDisposableIncome({
+        monthlyIncome: 25_500,
+        monthlyExpenses: 8_000,
+        rentMortgage: 1_950,
+        existingLoans: 20_000,
+      }),
+      14_550,
+    );
+    assert.equal(
+      computeMaxAffordableMonthlyPayment({
+        monthlyIncome: 25_500,
+        monthlyExpenses: 8_000,
+        rentMortgage: 1_950,
+        existingLoans: 0,
+      }),
+      Math.floor(15_550 * AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE),
+    );
+  });
+
+  it("rounds legacy 67% heuristic to 13_400", () => {
     assert.equal(PARTIAL_APPROVAL_RATIO, 0.67);
     assert.equal(suggestPartialApprovedAmount(20_000), 13_400);
+  });
+
+  it("offers ~13_400 partial for a tight financial profile", () => {
+    const ceiling = computeAffordabilityCeiling({
+      profile: tightProfile,
+      ...band,
+      ...quoteOpts,
+    });
+    assert.ok(ceiling >= 13_300 && ceiling <= 13_500, `ceiling was ${ceiling}`);
+
+    const offer = resolveAffordableApprovedAmount({
+      amount: 20_000,
+      ...band,
+      ...tightProfile,
+      ...quoteOpts,
+    });
+    assert.equal(offer, 13_400);
     assert.equal(
       resolveLocalApprovedAmount({
         amount: 20_000,
-        minLoanAmount: 1_000,
-        maxLoanAmount: 100_000,
-        monthlyIncome: 8_000,
-        monthlyExpenses: 7_000,
-        existingLoans: 0,
-        months: 3,
-        monthlyInterestRatePercent: 6,
+        ...band,
+        ...tightProfile,
+        ...quoteOpts,
       }),
       13_400,
+    );
+  });
+
+  it("approves full request for a strong financial profile", () => {
+    assert.equal(
+      resolveAffordableApprovedAmount({
+        amount: 20_000,
+        ...band,
+        ...strongProfile,
+        ...quoteOpts,
+      }),
+      20_000,
+    );
+    assert.equal(
+      resolveLocalApprovedAmount({
+        amount: 20_000,
+        ...band,
+        ...strongProfile,
+        ...quoteOpts,
+      }),
+      20_000,
     );
   });
 
@@ -86,19 +164,20 @@ describe("partial approval heuristic", () => {
     );
   });
 
-  it("keeps full request when income can afford it", () => {
+  it("declines when affordability ceiling is below min loan", () => {
     assert.equal(
       resolveLocalApprovedAmount({
         amount: 20_000,
         minLoanAmount: 1_000,
         maxLoanAmount: 100_000,
-        monthlyIncome: 80_000,
-        monthlyExpenses: 10_000,
+        monthlyIncome: 8_000,
+        monthlyExpenses: 7_500,
+        rentMortgage: 0,
         existingLoans: 0,
         months: 3,
         monthlyInterestRatePercent: 6,
       }),
-      20_000,
+      0,
     );
   });
 });
@@ -122,11 +201,13 @@ describe("clampAssessmentDecision", () => {
     assert.ok(decision.steps.every((step) => step.status === "passed"));
   });
 
-  it("offers 67% partial when local affordability fails", () => {
+  it("offers partial when local affordability is tight", () => {
     const decision = clampAssessmentDecision({
       ...base,
-      monthlyIncome: 8_000,
-      monthlyExpenses: 7_000,
+      monthlyIncome: 25_500,
+      monthlyExpenses: 8_000,
+      rentMortgage: 1_950,
+      existingLoans: 0,
       months: 3,
       monthlyInterestRatePercent: 6,
       ai: null,
@@ -134,6 +215,22 @@ describe("clampAssessmentDecision", () => {
     assert.equal(decision.approved, true);
     assert.equal(decision.approvedAmount, 13_400);
     assert.equal(decision.isPartialOffer, true);
+  });
+
+  it("approves full request for strong local affordability", () => {
+    const decision = clampAssessmentDecision({
+      ...base,
+      monthlyIncome: 300_000,
+      monthlyExpenses: 30_000,
+      rentMortgage: 0,
+      existingLoans: 0,
+      months: 3,
+      monthlyInterestRatePercent: 6,
+      ai: null,
+    });
+    assert.equal(decision.approved, true);
+    assert.equal(decision.approvedAmount, 20_000);
+    assert.equal(decision.isPartialOffer, false);
   });
 
   it("blocks approval when automatedApprovals is off", () => {
@@ -237,6 +334,27 @@ describe("clampAssessmentDecision", () => {
     assert.equal(decision.approved, true);
     assert.equal(decision.approvedAmount, 20_000);
     assert.equal(decision.isPartialOffer, false);
+  });
+
+  it("clamps AI full approval to affordability ceiling", () => {
+    const decision = clampAssessmentDecision({
+      ...base,
+      monthlyIncome: 25_500,
+      monthlyExpenses: 8_000,
+      rentMortgage: 1_950,
+      months: 3,
+      monthlyInterestRatePercent: 6,
+      ai: {
+        steps: buildLocalAssessmentSteps(true),
+        overallScore: 82,
+        eligible: true,
+        decisionHint: "approve",
+        approvedAmount: 20_000,
+      },
+    });
+    assert.equal(decision.approved, true);
+    assert.equal(decision.approvedAmount, 13_400);
+    assert.equal(decision.isPartialOffer, true);
   });
 });
 

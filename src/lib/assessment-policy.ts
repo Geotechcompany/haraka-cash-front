@@ -9,8 +9,20 @@ import { buildLoanQuote, MONTHLY_INTEREST } from "@/lib/loan";
 
 export type AssessmentDecisionHint = "approve" | "decline" | "manual_review";
 
-/** Fraction of request offered when full amount is not affordable (local fallback). */
+/** @deprecated Legacy 67% partial heuristic — kept for tests referencing the old fallback. */
 export const PARTIAL_APPROVAL_RATIO = 0.67;
+
+/**
+ * Estimated monthly debt service on outstanding loan balances (5% of principal).
+ * Used when applicants report total existing loan exposure in KES.
+ */
+export const EXISTING_LOAN_MONTHLY_SERVICE_FACTOR = 0.05;
+
+/**
+ * Share of disposable income allocated to the new HarakaCash monthly payment.
+ * 35% sits in the common 30–40% affordability band for unsecured consumer credit.
+ */
+export const AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE = 0.35;
 
 export type RawAiAssessment = {
   steps: AssessmentStepResult[];
@@ -37,6 +49,19 @@ export type ClampedAssessmentDecision = {
   policyBlocked: boolean;
 };
 
+export type FinancialProfile = {
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  existingLoans?: number;
+  rentMortgage?: number;
+};
+
+export type AffordabilityQuoteContext = {
+  months: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+};
+
 export type PolicyClampInput = {
   amount: number;
   minLoanAmount: number;
@@ -46,6 +71,7 @@ export type PolicyClampInput = {
   monthlyIncome?: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  rentMortgage?: number;
   months?: number;
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
@@ -63,7 +89,7 @@ export function roundToNearestHundred(n: number): number {
 }
 
 /**
- * Local partial-offer heuristic when the full request is not affordable:
+ * Legacy partial-offer heuristic when the full request is not affordable:
  * `round(request × 0.67 / 100) × 100` → e.g. 20_000 → 13_400.
  */
 export function suggestPartialApprovedAmount(requestedAmount: number): number {
@@ -92,7 +118,105 @@ export function clampApprovedAmount(input: {
 }
 
 /**
- * Residual income after expenses and a 5% monthly service assumption on existing debt.
+ * Disposable income after living costs, housing, and existing debt service.
+ *
+ * `residual = income − expenses − rentMortgage − (existingLoans × 5%)`
+ */
+export function computeDisposableIncome(profile: FinancialProfile): number {
+  const income = Math.max(0, profile.monthlyIncome ?? 0);
+  const expenses = Math.max(0, profile.monthlyExpenses ?? 0);
+  const rent = Math.max(0, profile.rentMortgage ?? 0);
+  const existing = Math.max(0, profile.existingLoans ?? 0);
+  const debtService = existing * EXISTING_LOAN_MONTHLY_SERVICE_FACTOR;
+  return Math.max(0, income - expenses - rent - debtService);
+}
+
+/**
+ * Max monthly payment the applicant can take on for this loan.
+ * `floor(disposable × 35%)` when income is known; 0 when disposable is 0.
+ */
+export function computeMaxAffordableMonthlyPayment(profile: FinancialProfile): number {
+  const income = Math.max(0, profile.monthlyIncome ?? 0);
+  if (income <= 0) return Number.POSITIVE_INFINITY;
+  const disposable = computeDisposableIncome(profile);
+  return Math.floor(disposable * AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE);
+}
+
+function quoteMonthlyForPrincipal(
+  principal: number,
+  quote: AffordabilityQuoteContext,
+): number {
+  return buildLoanQuote(principal, quote.months, {
+    monthlyInterestRatePercent: quote.monthlyInterestRatePercent ?? MONTHLY_INTEREST * 100,
+    minProcessingFee: quote.minProcessingFee,
+  }).monthly;
+}
+
+/**
+ * Highest principal (KES) whose quoted monthly payment fits within the affordability cap.
+ * Binary search over [minLoan, upperBound], stepped in 100 KES increments.
+ */
+export function solveMaxAffordablePrincipal(input: {
+  profile: FinancialProfile;
+  minLoanAmount: number;
+  upperBound: number;
+  months: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+}): number {
+  const maxPayment = computeMaxAffordableMonthlyPayment(input.profile);
+  if (!Number.isFinite(maxPayment) || maxPayment <= 0) return 0;
+
+  const quoteCtx: AffordabilityQuoteContext = {
+    months: Math.max(1, Math.round(input.months)),
+    monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+    minProcessingFee: input.minProcessingFee,
+  };
+
+  const minLoan = Math.max(100, Math.round(input.minLoanAmount));
+  const cap = Math.max(minLoan, Math.round(input.upperBound));
+  let lo = minLoan;
+  let hi = cap;
+  let best = 0;
+
+  while (lo <= hi) {
+    const mid = roundToNearestHundred(Math.round((lo + hi) / 2));
+    const clampedMid = Math.max(minLoan, Math.min(cap, mid));
+    const monthly = quoteMonthlyForPrincipal(clampedMid, quoteCtx);
+    if (monthly <= maxPayment) {
+      best = clampedMid;
+      lo = clampedMid + 100;
+    } else {
+      hi = clampedMid - 100;
+    }
+  }
+
+  return best;
+}
+
+/** Max principal the profile can service (before request / policy caps). */
+export function computeAffordabilityCeiling(input: {
+  profile: FinancialProfile;
+  minLoanAmount: number;
+  maxLoanAmount: number;
+  months: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+}): number {
+  const income = Math.max(0, input.profile.monthlyIncome ?? 0);
+  if (income <= 0) return input.maxLoanAmount;
+
+  return solveMaxAffordablePrincipal({
+    profile: input.profile,
+    minLoanAmount: input.minLoanAmount,
+    upperBound: input.maxLoanAmount,
+    months: input.months,
+    monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+    minProcessingFee: input.minProcessingFee,
+  });
+}
+
+/**
  * Full request is affordable when residual covers the quoted monthly payment.
  */
 export function canAffordRequestedLoan(input: {
@@ -101,19 +225,77 @@ export function canAffordRequestedLoan(input: {
   monthlyIncome: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  rentMortgage?: number;
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
 }): boolean {
-  const income = Math.max(0, input.monthlyIncome);
-  if (income <= 0) return true; // no income data → do not force a partial cut locally
-  const expenses = Math.max(0, input.monthlyExpenses ?? 0);
-  const existing = Math.max(0, input.existingLoans ?? 0);
-  const residual = income - expenses - existing * 0.05;
+  const profile: FinancialProfile = {
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+  };
+  const maxPayment = computeMaxAffordableMonthlyPayment(profile);
+  if (!Number.isFinite(maxPayment)) return true;
   const quote = buildLoanQuote(input.amount, input.months, {
     monthlyInterestRatePercent: input.monthlyInterestRatePercent ?? MONTHLY_INTEREST * 100,
     minProcessingFee: input.minProcessingFee,
   });
-  return residual >= quote.monthly;
+  return quote.monthly <= maxPayment;
+}
+
+/**
+ * Offer from affordability model: min(request, maxAffordablePrincipal), rounded to nearest 100.
+ * Returns 0 when max affordable falls below minLoan.
+ */
+export function resolveAffordableApprovedAmount(input: {
+  amount: number;
+  minLoanAmount: number;
+  maxLoanAmount: number;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  existingLoans?: number;
+  rentMortgage?: number;
+  months?: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+}): number {
+  const request = Math.round(input.amount);
+  if (!(request >= input.minLoanAmount && request <= input.maxLoanAmount)) {
+    return 0;
+  }
+
+  const profile: FinancialProfile = {
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+  };
+
+  const income = Math.max(0, profile.monthlyIncome ?? 0);
+  if (income <= 0) {
+    return request;
+  }
+
+  const months = Math.max(1, Math.round(input.months ?? 3));
+  const ceiling = computeAffordabilityCeiling({
+    profile,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+    months,
+    monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+    minProcessingFee: input.minProcessingFee,
+  });
+
+  if (ceiling < input.minLoanAmount) return 0;
+
+  const offer = roundToNearestHundred(Math.min(request, ceiling));
+  return clampApprovedAmount({
+    candidate: offer,
+    requestedAmount: request,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+  });
 }
 
 /** Deterministic local offer when AI is unavailable. */
@@ -124,33 +306,48 @@ export function resolveLocalApprovedAmount(input: {
   monthlyIncome?: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  rentMortgage?: number;
   months?: number;
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
 }): number {
-  const request = Math.round(input.amount);
-  if (!(request >= input.minLoanAmount && request <= input.maxLoanAmount)) {
-    return 0;
-  }
+  return resolveAffordableApprovedAmount(input);
+}
 
-  const months = Math.max(1, Math.round(input.months ?? 3));
-  const affordable = canAffordRequestedLoan({
-    amount: request,
-    months,
-    monthlyIncome: input.monthlyIncome ?? 0,
+/** Apply affordability ceiling to an AI or policy candidate offer. */
+export function applyAffordabilityCeiling(input: {
+  candidate: number;
+  amount: number;
+  minLoanAmount: number;
+  maxLoanAmount: number;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  existingLoans?: number;
+  rentMortgage?: number;
+  months?: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+}): number {
+  const affordableCap = resolveAffordableApprovedAmount({
+    amount: input.amount,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+    monthlyIncome: input.monthlyIncome,
     monthlyExpenses: input.monthlyExpenses,
     existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+    months: input.months,
     monthlyInterestRatePercent: input.monthlyInterestRatePercent,
     minProcessingFee: input.minProcessingFee,
   });
 
-  if (affordable) {
-    return request;
-  }
+  const income = Math.max(0, input.monthlyIncome ?? 0);
+  const cappedCandidate =
+    income > 0 ? Math.min(Math.round(input.candidate), affordableCap) : Math.round(input.candidate);
 
   return clampApprovedAmount({
-    candidate: suggestPartialApprovedAmount(request),
-    requestedAmount: request,
+    candidate: cappedCandidate,
+    requestedAmount: input.amount,
     minLoanAmount: input.minLoanAmount,
     maxLoanAmount: input.maxLoanAmount,
   });
@@ -226,6 +423,7 @@ export function clampAssessmentDecision(input: PolicyClampInput): ClampedAssessm
       monthlyIncome: input.monthlyIncome,
       monthlyExpenses: input.monthlyExpenses,
       existingLoans: input.existingLoans,
+      rentMortgage: input.rentMortgage,
       months: input.months,
       monthlyInterestRatePercent: input.monthlyInterestRatePercent,
       minProcessingFee: input.minProcessingFee,
@@ -278,11 +476,18 @@ export function clampAssessmentDecision(input: PolicyClampInput): ClampedAssessm
       typeof input.ai.approvedAmount === "number" && Number.isFinite(input.ai.approvedAmount)
         ? input.ai.approvedAmount
         : input.amount;
-    approvedAmount = clampApprovedAmount({
+    approvedAmount = applyAffordabilityCeiling({
       candidate,
-      requestedAmount: input.amount,
+      amount: input.amount,
       minLoanAmount: input.minLoanAmount,
       maxLoanAmount: input.maxLoanAmount,
+      monthlyIncome: input.monthlyIncome,
+      monthlyExpenses: input.monthlyExpenses,
+      existingLoans: input.existingLoans,
+      rentMortgage: input.rentMortgage,
+      months: input.months,
+      monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+      minProcessingFee: input.minProcessingFee,
     });
   }
 
@@ -295,7 +500,9 @@ export function clampAssessmentDecision(input: PolicyClampInput): ClampedAssessm
       ? "Outside automated lending policy."
       : approved && !stillApproved
         ? "Approved amount fell below the minimum loan."
-        : undefined);
+        : isPartialOffer
+          ? "Partial offer based on affordability."
+          : undefined);
 
   return {
     approved: stillApproved,

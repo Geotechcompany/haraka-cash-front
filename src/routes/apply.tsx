@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { isDraftWorthSaving } from "@/lib/application-draft";
+import { computeAffordabilityCeiling } from "@/lib/assessment-policy";
 import { buildLoanQuote, kes } from "@/lib/loan";
 import { kenyanNationalIdError, kenyanPhoneError } from "@/lib/kenya-format";
 import { cn } from "@/lib/utils";
@@ -137,6 +138,39 @@ function ApplyPage() {
     riskBand: serverQuote?.riskBand,
     source: serverQuote?.source ?? ("local" as const),
   };
+
+  const maxEligiblePrincipal = useMemo(() => {
+    const income = Number(form.monthlyIncome);
+    if (!Number.isFinite(income) || income <= 0) return null;
+    const expenses = Number(form.monthlyExpenses);
+    const loans = Number(form.existingLoans);
+    const rent = Number(form.rentMortgage);
+    const ceiling = computeAffordabilityCeiling({
+      profile: {
+        monthlyIncome: income,
+        monthlyExpenses: Number.isFinite(expenses) ? expenses : 0,
+        existingLoans: Number.isFinite(loans) ? loans : 0,
+        rentMortgage: Number.isFinite(rent) ? rent : 0,
+      },
+      minLoanAmount: lendingPolicy.minLoanAmount,
+      maxLoanAmount: lendingPolicy.maxLoanAmount,
+      months,
+      monthlyInterestRatePercent: lendingPolicy.monthlyInterestRate,
+      minProcessingFee: lendingPolicy.minProcessingFee,
+    });
+    if (ceiling < lendingPolicy.minLoanAmount) return null;
+    return ceiling;
+  }, [
+    form.monthlyIncome,
+    form.monthlyExpenses,
+    form.existingLoans,
+    form.rentMortgage,
+    lendingPolicy.maxLoanAmount,
+    lendingPolicy.minLoanAmount,
+    lendingPolicy.minProcessingFee,
+    lendingPolicy.monthlyInterestRate,
+    months,
+  ]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -282,6 +316,7 @@ function ApplyPage() {
     const income = Number(form.monthlyIncome);
     const expenses = Number(form.monthlyExpenses);
     const loans = Number(form.existingLoans);
+    const rent = Number(form.rentMortgage);
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setQuoteUpdating(true);
@@ -293,6 +328,7 @@ function ApplyPage() {
             monthlyIncome: Number.isFinite(income) ? income : undefined,
             monthlyExpenses: Number.isFinite(expenses) ? expenses : undefined,
             existingLoans: Number.isFinite(loans) ? loans : undefined,
+            rentMortgage: Number.isFinite(rent) ? rent : undefined,
             employmentStatus: form.employmentStatus || undefined,
             purpose: form.purpose || undefined,
           },
@@ -323,6 +359,7 @@ function ApplyPage() {
     form.monthlyIncome,
     form.monthlyExpenses,
     form.existingLoans,
+    form.rentMortgage,
     form.employmentStatus,
     form.purpose,
     generateLoanQuoteFn,
@@ -357,6 +394,7 @@ function ApplyPage() {
           monthlyIncome: Number(form.monthlyIncome) || 0,
           monthlyExpenses: Number(form.monthlyExpenses) || 0,
           existingLoans: Number(form.existingLoans) || 0,
+          rentMortgage: Number(form.rentMortgage) || 0,
           quote: {
             amount: quote.amount,
             months: quote.months,
@@ -836,6 +874,11 @@ function ApplyPage() {
             </div>
             {quote.notes && (
               <p className="mt-4 text-xs text-muted-foreground leading-relaxed">{quote.notes}</p>
+            )}
+            {maxEligiblePrincipal != null && maxEligiblePrincipal > amount && (
+              <p className="mt-4 text-xs text-muted-foreground leading-relaxed">
+                Based on your finances, you may qualify for up to {kes(maxEligiblePrincipal)}.
+              </p>
             )}
             <p className="mt-5 text-xs text-muted-foreground">
               Final terms subject to eligibility assessment.

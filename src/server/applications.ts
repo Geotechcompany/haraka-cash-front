@@ -232,6 +232,7 @@ const createApplicationInput = z.object({
   monthlyIncome: z.number().optional(),
   monthlyExpenses: z.number().nonnegative().optional(),
   existingLoans: z.number().nonnegative().optional(),
+  rentMortgage: z.number().nonnegative().optional(),
   quote: z.object({
     amount: z.number(),
     months: z.number(),
@@ -290,6 +291,7 @@ export const createApplication = createServerFn({ method: "POST" })
       monthlyIncome: data.monthlyIncome ?? 0,
       monthlyExpenses: data.monthlyExpenses,
       existingLoans: data.existingLoans,
+      rentMortgage: data.rentMortgage,
       amount: data.amount,
       months: data.months,
       purpose: data.purpose,
@@ -358,6 +360,7 @@ export const runAssessment = createServerFn({ method: "POST" })
         monthlyIncome: doc.monthlyIncome,
         monthlyExpenses: doc.monthlyExpenses,
         existingLoans: doc.existingLoans,
+        rentMortgage: doc.rentMortgage,
         amount: doc.amount,
         months: doc.months,
         purpose: doc.purpose,

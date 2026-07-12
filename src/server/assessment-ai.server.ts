@@ -13,7 +13,11 @@ import {
   type AssessmentStepId,
 } from "@/lib/assessment-steps";
 import {
+  AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE,
   clampAssessmentDecision,
+  computeAffordabilityCeiling,
+  computeDisposableIncome,
+  computeMaxAffordableMonthlyPayment,
   normalizeAssessmentSteps,
   type AssessmentDecisionHint,
   type ClampedAssessmentDecision,
@@ -100,6 +104,7 @@ export type AssessmentAiInput = {
   monthlyIncome: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  rentMortgage?: number;
   amount: number;
   months: number;
   purpose: string;
@@ -114,6 +119,23 @@ export type AssessmentAiInput = {
 
 function buildAssessmentPrompt(input: AssessmentAiInput): string {
   const stepCatalog = ASSESSMENT_STEP_IDS.map((id) => `"${id}"`).join(", ");
+  const profile = {
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+  };
+  const disposable = computeDisposableIncome(profile);
+  const maxMonthlyPayment = computeMaxAffordableMonthlyPayment(profile);
+  const affordabilityCeiling = computeAffordabilityCeiling({
+    profile,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+    months: input.months,
+    monthlyInterestRatePercent: input.monthlyInterestRate,
+    minProcessingFee: input.minProcessingFee,
+  });
+
   return `You are HarakaCash credit analyst for Kenya consumer loans. Return ONLY valid JSON:
 {
   "steps": [
@@ -147,7 +169,11 @@ Application:
 - yearsAtEmployer: ${input.yearsAtEmployer ?? "unknown"}
 - monthlyIncome: ${input.monthlyIncome}
 - monthlyExpenses: ${input.monthlyExpenses ?? "unknown"}
+- rentMortgage: ${input.rentMortgage ?? "unknown"}
 - existingLoans: ${input.existingLoans ?? "unknown"}
+- disposableIncome: ${disposable} (income − expenses − rent − 5% of existing loans)
+- maxAffordableMonthlyPayment: ${Number.isFinite(maxMonthlyPayment) ? maxMonthlyPayment : "unknown"} (${AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE * 100}% of disposable)
+- affordabilityCeilingPrincipal: ${affordabilityCeiling} (max principal before hard policy clamp; never exceed loanAmount)
 - loanAmount: ${input.amount}
 - termMonths: ${input.months}
 - purpose: ${input.purpose || "unknown"}
@@ -172,7 +198,7 @@ Rules:
 2. If amount is outside min/max loan band, decisionHint must be "decline" and eligible false.
 3. If automatedApprovals is false, decisionHint must be "manual_review" or "decline", never "approve".
 4. decisionHint must be exactly "approve", "decline", or "manual_review" — never "review".
-5. When approving, set approvedAmount to an integer KES offer ≤ loanAmount and ≥ minLoanAmount. Prefer the full request when affordable; otherwise offer a lower amount the applicant can service (partial approval is allowed). Use 0 only when declining.
+5. When approving, set approvedAmount to an integer KES offer ≤ loanAmount and ≥ minLoanAmount. Prefer the full request when affordable; otherwise offer a lower amount the applicant can service (partial approval is allowed). Never exceed affordabilityCeilingPrincipal. Use 0 only when declining.
 6. When declining, set approvedAmount to 0 (or omit it).
 7. notes: plain sentence, no marketing, never say "simulation".
 8. JSON only.`;
@@ -276,6 +302,7 @@ export async function runAiAssessmentWithPolicy(
     monthlyIncome: input.monthlyIncome,
     monthlyExpenses: input.monthlyExpenses,
     existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
     months: input.months,
     monthlyInterestRatePercent: input.monthlyInterestRate,
     minProcessingFee: input.minProcessingFee,

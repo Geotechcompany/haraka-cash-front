@@ -1,5 +1,5 @@
 import { clerkMiddleware } from "@clerk/tanstack-react-start/server";
-import { createStart, createMiddleware } from "@tanstack/react-start";
+import { createCsrfMiddleware, createStart, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
 
@@ -8,6 +8,10 @@ const clerkAuth = clerkMiddleware({
   signUpUrl: "/register",
   signInFallbackRedirectUrl: "/dashboard",
   signUpFallbackRedirectUrl: "/dashboard",
+});
+
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
 const authMiddleware = createMiddleware().server(async ({ request, next, context }) => {
@@ -36,5 +40,5 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [authMiddleware, errorMiddleware],
+  requestMiddleware: [csrfMiddleware, authMiddleware, errorMiddleware],
 }));

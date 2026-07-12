@@ -31,6 +31,7 @@ export type ApplicationRecord = {
   monthlyIncome: number;
   monthlyExpenses?: number;
   existingLoans?: number;
+  rentMortgage?: number;
   /** Requested principal (KES). */
   amount: number;
   /** Offered / approved principal after assessment (KES). ≤ amount when set. */
