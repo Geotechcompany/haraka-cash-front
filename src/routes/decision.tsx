@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles, Smartphone } from "lucide-react";
+import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles, Smartphone, Clock } from "lucide-react";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,54 @@ function DecisionPage() {
   }
 
   const quote = application.quote;
+
+  if (application.status === "UnderReview") {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <motion.div
+            initial={{ scale: 0.7 }}
+            animate={{ scale: 1 }}
+            className="mx-auto h-20 w-20 rounded-3xl bg-primary-soft text-primary grid place-items-center"
+          >
+            <Clock className="h-10 w-10" />
+          </motion.div>
+          <h1 className="mt-6 text-3xl font-bold">Under review for CRB checks</h1>
+          <p className="mt-3 text-muted-foreground">
+            We received your processing fee. Our team is running credit bureau (CRB) checks on application{" "}
+            {application.id}. You will get a decision after this review — funds are not disbursed yet.
+          </p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6">
+            <Link to="/loans">View my loans</Link>
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (application.status === "Disbursing") {
+    return (
+      <AppShell>
+        <div className="max-w-xl mx-auto text-center">
+          <motion.div
+            initial={{ scale: 0.7 }}
+            animate={{ scale: 1 }}
+            className="mx-auto h-20 w-20 rounded-3xl bg-success/15 text-success grid place-items-center"
+          >
+            <CheckCircle2 className="h-10 w-10" />
+          </motion.div>
+          <h1 className="mt-6 text-3xl font-bold">Disbursement in progress</h1>
+          <p className="mt-3 text-muted-foreground">
+            CRB review is complete. Your loan of {kes(quote.amount)} is being sent to M-Pesa.
+          </p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6">
+            <Link to="/loans">View my loans</Link>
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
+
   const approved = application.status === "Approved";
 
   const schedule = Array.from({ length: quote.months }).map((_, i) => ({
@@ -157,7 +205,9 @@ function DecisionPage() {
           <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6 text-3xl md:text-4xl font-bold tracking-tight">
             You're approved! <Sparkles className="inline h-6 w-6 text-warning" />
           </motion.h1>
-          <p className="mt-3 text-muted-foreground">Pay the processing fee via M-Pesa STK Push to release your loan.</p>
+          <p className="mt-3 text-muted-foreground">
+            Pay the processing fee via M-Pesa. After payment, our team runs CRB checks before disbursement.
+          </p>
         </div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8 rounded-3xl gradient-brand text-white p-8 shadow-elevated">
@@ -183,7 +233,8 @@ function DecisionPage() {
             <p className="font-semibold">Pay processing fee via M-Pesa</p>
           </div>
           <p className="text-sm text-muted-foreground">
-            We will send an STK push for {kes(quote.fee)}. Enter your M-Pesa PIN on your phone to accept the offer and start disbursement.
+            We will send an STK push for {kes(quote.fee)}. Enter your M-Pesa PIN to accept the offer.
+            Your application then goes to our team for CRB (credit bureau) checks — disbursement follows after review.
           </p>
           <div className="mt-4 space-y-1.5">
             <Label htmlFor="mpesa-phone">M-Pesa number</Label>

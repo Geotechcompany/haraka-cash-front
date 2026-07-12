@@ -15,6 +15,8 @@ export type AdminUser = {
   county: string;
   eligibilityScore: number;
   availableCredit: number;
+  referralCreditsEarned: number;
+  referralCount: number;
   status: AdminUserStatus;
   applicationCount: number;
   totalBorrowed: number;
@@ -58,6 +60,8 @@ export const listAdminUsers = createServerFn({ method: "GET" }).handler(async ()
       county: user.county ?? "",
       eligibilityScore: user.eligibilityScore,
       availableCredit: user.availableCredit,
+      referralCreditsEarned: user.referralCreditsEarned ?? 0,
+      referralCount: user.referralCount ?? 0,
       status: storedStatus === "Suspended" ? "Suspended" : "Active",
       applicationCount: totals?.applicationCount ?? 0,
       totalBorrowed: totals?.totalBorrowed ?? 0,

@@ -9,6 +9,7 @@ const links = [
   { to: "/dashboard", label: "Home" },
   { to: "/loans", label: "Loans" },
   { to: "/apply", label: "Apply" },
+  { to: "/referrals", label: "Refer" },
   { to: "/notifications", label: "Alerts" },
   { to: "/profile", label: "Profile" },
 ] as const;
@@ -19,7 +20,7 @@ export function AppTopbar() {
   return (
     <header className="sticky top-0 z-30 glass border-b border-border/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:h-16 sm:px-6 lg:px-8">
-        <Logo to="/dashboard" height={40} className="max-w-[180px] sm:max-w-[200px]" />
+        <Logo to="/dashboard" height={48} className="max-h-9 max-w-[160px] sm:max-h-12 sm:max-w-[220px]" />
         <nav className="ml-4 hidden items-center gap-0.5 md:flex" aria-label="Primary">
           {links.map((link) => {
             const active = path === link.to;

@@ -87,18 +87,19 @@ function TermsPage() {
         </p>
         <p>
           The processing fee is charged as described in the offer screen (for example via M-Pesa STK
-          push through our payment partner). Funds are disbursed only after the fee step required by
-          that offer is completed successfully. We do not add undisclosed fees at payout.
+          push through our payment partner). After the fee is paid, our team runs CRB (credit bureau)
+          checks. Funds are disbursed only after that review is cleared. We do not add undisclosed
+          fees at payout.
         </p>
       </LegalSection>
 
       <LegalSection title="6. Disbursement">
         <p>
-          Approved and accepted loans are sent to the M-Pesa number (or other channel) you confirmed.
-          Timing is usually within minutes after acceptance and any required fee payment, but network
-          delays, incorrect numbers, or processor outages can slow or fail a payout. If a transfer
-          fails, contact Support with your application or loan reference; we will retry or reverse
-          according to the payment trail.
+          After CRB review is cleared, approved loans are sent to the M-Pesa number (or other channel)
+          you confirmed. Timing depends on review completion and the payment network; delays,
+          incorrect numbers, or processor outages can slow or fail a payout. If a transfer fails,
+          contact Support with your application or loan reference; we will retry or reverse according
+          to the payment trail.
         </p>
       </LegalSection>
 

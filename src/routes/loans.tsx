@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { kes } from "@/lib/loan";
+import { applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { listApplications } from "@/server/applications";
 
@@ -22,6 +23,8 @@ const statusStyles: Record<string, string> = {
   Declined: "bg-destructive/10 text-destructive border-destructive/20",
   Completed: "bg-muted text-muted-foreground",
   Disbursing: "bg-primary-soft text-primary border-primary/20",
+  UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
+  DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
 };
 
 const springEnter = { type: "spring" as const, bounce: 0, duration: 0.35 };
@@ -30,15 +33,29 @@ const STAGGER = 0.045;
 function LoansPage() {
   const applications = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
-  const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
+  const activeLoan = applications.find(
+    (a) =>
+      a.status === "Approved" ||
+      a.status === "Disbursing" ||
+      a.status === "UnderReview",
+  );
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
-  const filtered = applications.filter(
-    (a) =>
-      (tab === "all" || a.status.toLowerCase() === tab) &&
-      (a.id.toLowerCase().includes(q.toLowerCase()) ||
-        a.purpose.toLowerCase().includes(q.toLowerCase())),
-  );
+  const filtered = applications.filter((a) => {
+    const matchesQuery =
+      a.id.toLowerCase().includes(q.toLowerCase()) ||
+      a.purpose.toLowerCase().includes(q.toLowerCase());
+    if (!matchesQuery) return false;
+    if (tab === "all") return true;
+    if (tab === "pending") {
+      return (
+        a.status === "Pending" ||
+        a.status === "UnderReview" ||
+        a.status === "DocumentsRequired"
+      );
+    }
+    return a.status.toLowerCase() === tab;
+  });
 
   return (
     <AppShell>
@@ -71,16 +88,25 @@ function LoansPage() {
               </p>
             </div>
             <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
-              {activeLoan.status}
+              {applicationStatusLabel(activeLoan.status)}
             </span>
           </div>
           <ol className="grid gap-2 sm:grid-cols-4 sm:gap-3">
             {[
-              { l: "Pending review", done: true, icon: CheckCircle2 },
-              { l: "Approved", done: activeLoan.status !== "Pending", icon: CheckCircle2 },
+              {
+                l: "Fee paid",
+                done:
+                  activeLoan.status === "UnderReview" || activeLoan.status === "Disbursing",
+                icon: CheckCircle2,
+              },
+              {
+                l: "CRB review",
+                done: activeLoan.status === "Disbursing",
+                icon: activeLoan.status === "UnderReview" ? Clock : CheckCircle2,
+              },
               {
                 l: "Disbursed",
-                done: activeLoan.status === "Disbursing" || activeLoan.status === "Approved",
+                done: activeLoan.status === "Disbursing",
                 icon: CheckCircle2,
               },
               { l: "Repayment", done: false, icon: Clock },
@@ -155,7 +181,7 @@ function LoansPage() {
                     statusStyles[a.status],
                   )}
                 >
-                  {a.status}
+                  {applicationStatusLabel(a.status)}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">

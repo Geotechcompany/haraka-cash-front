@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { kes } from "@/lib/loan";
+import { applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getAdminApplication, listApplications, reviewApplication } from "@/server/applications";
 
@@ -34,6 +35,7 @@ const statusStyles: Record<string, string> = {
   Completed: "bg-muted text-muted-foreground",
   Disbursing: "bg-primary-soft text-primary border-primary/20",
   DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
+  UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
 };
 
 function ApplicationsPage() {
@@ -49,18 +51,31 @@ function ApplicationsPage() {
   const [note, setNote] = useState("");
   const [documents, setDocuments] = useState("National ID, Proof of income");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const rows = applications.filter(
-    (a) =>
-      (tab === "all" || a.status.toLowerCase() === tab) &&
-      (a.applicant.toLowerCase().includes(q.toLowerCase()) ||
-        a.id.toLowerCase().includes(q.toLowerCase())),
-  );
+  const rows = applications.filter((a) => {
+    const matchesQuery =
+      a.applicant.toLowerCase().includes(q.toLowerCase()) ||
+      a.id.toLowerCase().includes(q.toLowerCase());
+    if (!matchesQuery) return false;
+    if (tab === "all") return true;
+    if (tab === "pending") {
+      return (
+        a.status === "Pending" ||
+        a.status === "UnderReview" ||
+        a.status === "DocumentsRequired"
+      );
+    }
+    return a.status.toLowerCase() === tab;
+  });
 
   const approve = async (applicationNumber: string) => {
     setIsSubmitting(true);
     try {
-      await review({ data: { applicationNumber, action: "approve" } });
-      toast.success("Application approved");
+      const result = await review({ data: { applicationNumber, action: "approve" } });
+      toast.success(
+        result.status === "Disbursing"
+          ? "CRB cleared — disbursement started"
+          : "Application approved",
+      );
       await router.invalidate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not approve application");
@@ -202,7 +217,7 @@ function ApplicationsPage() {
                         statusStyles[a.status],
                       )}
                     >
-                      {a.status}
+                      {applicationStatusLabel(a.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -217,7 +232,13 @@ function ApplicationsPage() {
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
-                        disabled={isSubmitting || a.status === "Approved"}
+                        disabled={
+                          isSubmitting ||
+                          a.status === "Approved" ||
+                          a.status === "Disbursing" ||
+                          a.status === "Declined" ||
+                          a.status === "Completed"
+                        }
                         onClick={() => approve(a.id)}
                         variant="ghost"
                         size="icon"
@@ -270,7 +291,7 @@ function ApplicationsPage() {
               <Detail label="Income" value={kes(detail.monthlyIncome)} />
               <Detail label="Employer" value={detail.employer} />
               <Detail label="Purpose" value={detail.purpose} />
-              <Detail label="Status" value={detail.status} />
+              <Detail label="Status" value={applicationStatusLabel(detail.status)} />
               {detail.reviewNotes && <Detail label="Review notes" value={detail.reviewNotes} />}
             </div>
           )}

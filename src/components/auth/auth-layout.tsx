@@ -11,9 +11,9 @@ export function AuthLayout({
       <div className="relative hidden lg:flex flex-col justify-between p-10 gradient-brand text-white overflow-hidden">
         <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-white/10 blur-3xl" aria-hidden />
         <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-black/10 blur-3xl" aria-hidden />
-        <Logo variant="white" />
+        <Logo variant="white" height={80} className="max-w-[300px]" />
         <div className="relative max-w-md">
-          <p className="text-3xl font-bold leading-tight">"HarakaCash gave me the working capital I needed within 5 minutes."</p>
+          <p className="text-3xl font-bold leading-tight">"HarakaCash helped me get working capital after a clear CRB review."</p>
           <p className="mt-4 text-sm opacity-80">— Small business owner, Nairobi</p>
         </div>
         <div className="relative text-xs opacity-70">© HarakaCash · Nairobi, Kenya</div>
@@ -21,7 +21,9 @@ export function AuthLayout({
 
       <div className="flex flex-col">
         <div className="flex items-center justify-between p-4 lg:p-6">
-          <div className="lg:hidden"><Logo /></div>
+          <div className="lg:hidden">
+            <Logo height={48} className="max-w-[200px]" />
+          </div>
           <div className="ml-auto"><ThemeToggle /></div>
         </div>
         <div className="flex-1 flex items-center justify-center px-6 py-10">

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
 const steps = [
   { title: "Apply", body: "Tell us how much you need and for how long." },
   { title: "Decide", body: "We check affordability and return an offer on the spot." },
-  { title: "Get paid", body: "Funds land on your M-Pesa after you accept." },
+  { title: "Get paid", body: "Pay the fee, then our team clears CRB checks before M-Pesa payout." },
 ];
 
 const faqs = [
@@ -40,7 +40,7 @@ const faqs = [
   },
   {
     q: "How fast is disbursement?",
-    a: "After you accept and pay the processing fee, funds usually reach M-Pesa within five minutes.",
+    a: "After you pay the processing fee, our team runs CRB checks. Once cleared, funds go to M-Pesa.",
   },
   {
     q: "What are the fees?",
@@ -48,7 +48,11 @@ const faqs = [
   },
   {
     q: "Do you pull a credit bureau file?",
-    a: "We run an internal affordability check. This product does not claim live bureau access.",
+    a: "Yes. After you accept and pay the processing fee, our team runs CRB (credit bureau) checks before disbursement.",
+  },
+  {
+    q: "Can I raise my limit by inviting friends?",
+    a: "Yes. Share your referral link from the app. When someone creates an account with it, your available credit goes up by KES 1,000 (up to 10 people).",
   },
   {
     q: "What if I repay late?",
@@ -66,7 +70,7 @@ function Landing() {
     <div className="min-h-dvh bg-background font-sans">
       <header className="sticky top-0 z-30 glass border-b border-white/10">
         <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-          <Logo height={52} className="max-w-[260px]" />
+          <Logo height={64} className="max-h-11 max-w-[200px] sm:max-h-16 sm:max-w-[280px]" />
           <nav className="ml-8 hidden items-center gap-1 text-sm md:flex" aria-label="Primary">
             <a href="#how" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
               How it works
@@ -278,7 +282,7 @@ function Landing() {
             className="mx-auto max-w-3xl"
           >
             <p className="font-display text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">
-              “Stock money hit my M-Pesa in under five minutes. What I saw on the offer is what I paid.”
+              “After CRB clearance, stock money hit my M-Pesa. What I saw on the offer is what I paid.”
             </p>
             <footer className="mt-6 text-sm text-muted-foreground">Shop owner · Nairobi</footer>
           </motion.blockquote>
@@ -340,7 +344,7 @@ function Landing() {
       <footer className="border-t">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4 lg:px-8">
           <div>
-            <Logo height={52} className="max-w-[260px]" />
+            <Logo height={64} className="max-w-[280px]" />
             <p className="mt-3 max-w-xs text-sm text-muted-foreground">
               Digital loans for Kenya, with M-Pesa payout and an offer you can read before you accept.
             </p>

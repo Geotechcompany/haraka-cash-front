@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { ThemeProvider } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { CookieConsentBanner } from "@/components/legal/cookie-consent-banner";
+import { ReferralBootstrap } from "@/components/referrals/referral-bootstrap";
 
 function NotFoundComponent() {
   return (
@@ -106,6 +107,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ReferralBootstrap />
       <Outlet />
       <CookieConsentBanner />
       <Toaster position="top-center" richColors />

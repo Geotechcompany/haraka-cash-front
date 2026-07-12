@@ -21,7 +21,7 @@ export function processingFee(amount: number): number {
   return Math.round(amount * 0.022);
 }
 
-/** Simple monthly interest rate (indicative demo only). */
+/** Simple monthly interest rate (indicative). */
 export const MONTHLY_INTEREST = 0.06;
 
 export function loanQuote(amount: number, months: number) {

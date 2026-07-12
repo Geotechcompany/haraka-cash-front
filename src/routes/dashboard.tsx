@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Plus,
   FileText,
+  Gift,
 } from "lucide-react";
 import {
   AreaChart,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { kes } from "@/lib/loan";
+import { applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getCurrentUser, listApplications } from "@/server/applications";
 import { getDashboardStats, getUserLoanHistory } from "@/server/analytics";
@@ -48,6 +50,8 @@ const statusStyles: Record<string, string> = {
   Declined: "bg-destructive/10 text-destructive border-destructive/20",
   Completed: "bg-muted text-muted-foreground",
   Disbursing: "bg-primary-soft text-primary border-primary/20",
+  UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
+  DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
 };
 
 const springEnter = { type: "spring" as const, bounce: 0, duration: 0.4 };
@@ -63,7 +67,12 @@ function Dashboard() {
   const { user, applications, notifications, loanHistory, stats } = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
   const recent = applications.slice(0, 5);
-  const activeLoan = applications.find((a) => a.status === "Approved" || a.status === "Disbursing");
+  const activeLoan = applications.find(
+    (a) =>
+      a.status === "Approved" ||
+      a.status === "Disbursing" ||
+      a.status === "UnderReview",
+  );
   const unread = notifications.filter((n) => n.unread).length;
   const profilePct = user?.profileComplete ?? 0;
   const score = user?.eligibilityScore ?? 0;
@@ -146,6 +155,16 @@ function Dashboard() {
             >
               <Link to="/loans">
                 My loans <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="ghost"
+              className="rounded-xl text-white hover:bg-white/10"
+            >
+              <Link to="/referrals">
+                <Gift className="mr-1 h-4 w-4" /> Refer & earn
               </Link>
             </Button>
           </div>
@@ -298,7 +317,7 @@ function Dashboard() {
                         statusStyles[app.status],
                       )}
                     >
-                      {app.status}
+                      {applicationStatusLabel(app.status)}
                     </span>
                   </div>
                 </motion.li>

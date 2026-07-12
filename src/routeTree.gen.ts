@@ -14,6 +14,7 @@ import { Route as SupportRouteImport } from './routes/support'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ReferralsRouteImport } from './routes/referrals'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OtpRouteImport } from './routes/otp'
@@ -29,10 +30,12 @@ import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as RCodeRouteImport } from './routes/r.$code'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminReferralsRouteImport } from './routes/admin.referrals'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminLoansRouteImport } from './routes/admin.loans'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
@@ -64,6 +67,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferralsRoute = ReferralsRouteImport.update({
+  id: '/referrals',
+  path: '/referrals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -141,6 +149,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const RCodeRoute = RCodeRouteImport.update({
+  id: '/r/$code',
+  path: '/r/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -159,6 +172,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
 const AdminReportsRoute = AdminReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReferralsRoute = AdminReferralsRouteImport.update({
+  id: '/referrals',
+  path: '/referrals',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
@@ -213,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/otp': typeof OtpRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/referrals': typeof ReferralsRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -223,10 +242,12 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/loans': typeof AdminLoansRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
@@ -245,6 +266,7 @@ export interface FileRoutesByTo {
   '/otp': typeof OtpRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/referrals': typeof ReferralsRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -255,10 +277,12 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/loans': typeof AdminLoansRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/r/$code': typeof RCodeRoute
   '/admin': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
@@ -279,6 +303,7 @@ export interface FileRoutesById {
   '/otp': typeof OtpRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
+  '/referrals': typeof ReferralsRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -289,10 +314,12 @@ export interface FileRoutesById {
   '/admin/audit': typeof AdminAuditRoute
   '/admin/loans': typeof AdminLoansRoute
   '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/referrals': typeof AdminReferralsRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
@@ -314,6 +341,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/privacy'
     | '/profile'
+    | '/referrals'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
@@ -324,10 +352,12 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/loans'
     | '/admin/payments'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/r/$code'
     | '/admin/'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
@@ -346,6 +376,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/privacy'
     | '/profile'
+    | '/referrals'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
@@ -356,10 +387,12 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/loans'
     | '/admin/payments'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/r/$code'
     | '/admin'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
@@ -379,6 +412,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/privacy'
     | '/profile'
+    | '/referrals'
     | '/register'
     | '/settings'
     | '/sitemap.xml'
@@ -389,10 +423,12 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/loans'
     | '/admin/payments'
+    | '/admin/referrals'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/r/$code'
     | '/admin/'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
@@ -413,11 +449,13 @@ export interface RootRouteChildren {
   OtpRoute: typeof OtpRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
+  ReferralsRoute: typeof ReferralsRoute
   RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
+  RCodeRoute: typeof RCodeRoute
   ApiWebhooksSmplyPayRoute: typeof ApiWebhooksSmplyPayRoute
   ApiAdminReportsReportFormatRoute: typeof ApiAdminReportsReportFormatRoute
 }
@@ -457,6 +495,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referrals': {
+      id: '/referrals'
+      path: '/referrals'
+      fullPath: '/referrals'
+      preLoaderRoute: typeof ReferralsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -564,6 +609,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/r/$code': {
+      id: '/r/$code'
+      path: '/r/$code'
+      fullPath: '/r/$code'
+      preLoaderRoute: typeof RCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -590,6 +642,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/admin/reports'
       preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/referrals': {
+      id: '/admin/referrals'
+      path: '/referrals'
+      fullPath: '/admin/referrals'
+      preLoaderRoute: typeof AdminReferralsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/payments': {
@@ -650,6 +709,7 @@ interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminLoansRoute: typeof AdminLoansRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminReferralsRoute: typeof AdminReferralsRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSupportRoute: typeof AdminSupportRoute
@@ -663,6 +723,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminLoansRoute: AdminLoansRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminReferralsRoute: AdminReferralsRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSupportRoute: AdminSupportRoute,
@@ -687,11 +748,13 @@ const rootRouteChildren: RootRouteChildren = {
   OtpRoute: OtpRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
+  ReferralsRoute: ReferralsRoute,
   RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
+  RCodeRoute: RCodeRoute,
   ApiWebhooksSmplyPayRoute: ApiWebhooksSmplyPayRoute,
   ApiAdminReportsReportFormatRoute: ApiAdminReportsReportFormatRoute,
 }

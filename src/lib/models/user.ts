@@ -10,6 +10,16 @@ export type UserRecord = {
   county?: string;
   eligibilityScore: number;
   availableCredit: number;
+  /** Unique invite code this user shares (`?ref=`). */
+  referralCode?: string;
+  /** Clerk ID of the user who referred this account. */
+  referredByClerkId?: string;
+  /** Referral code used at signup (audit). */
+  referredByCode?: string;
+  /** Lifetime credit earned from successful referrals (KES). */
+  referralCreditsEarned?: number;
+  /** Successful referrals that awarded credit. */
+  referralCount?: number;
   profileComplete: number;
   status?: UserStatus;
   createdAt: Date;

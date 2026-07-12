@@ -17,6 +17,7 @@ import {
 import { AdminShell } from "@/components/layout/admin-shell";
 import { StatCard } from "@/components/ui-extras/stat-card";
 import { kes } from "@/lib/loan";
+import { applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { listApplications } from "@/server/applications";
 import { getMonthlyLoanVolume } from "@/server/analytics";
@@ -38,6 +39,8 @@ const statusStyles: Record<string, string> = {
   Declined: "bg-destructive/10 text-destructive border-destructive/20",
   Completed: "bg-muted text-muted-foreground",
   Disbursing: "bg-primary-soft text-primary border-primary/20",
+  UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
+  DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
 };
 
 function AdminDashboard() {
@@ -226,7 +229,7 @@ function AdminDashboard() {
                         statusStyles[a.status],
                       )}
                     >
-                      {a.status}
+                      {applicationStatusLabel(a.status)}
                     </span>
                   </td>
                 </motion.tr>

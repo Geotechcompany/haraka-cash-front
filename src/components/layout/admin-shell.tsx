@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, FileText, Users, Banknote, CreditCard,
-  BarChart3, Settings, LifeBuoy, ScrollText, PieChart,
+  BarChart3, Settings, LifeBuoy, ScrollText, PieChart, Gift,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
@@ -13,6 +13,7 @@ const items: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/applications", label: "Applications", icon: FileText },
   { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/referrals", label: "Referrals", icon: Gift },
   { to: "/admin/loans", label: "Loans", icon: Banknote },
   { to: "/admin/payments", label: "Payments", icon: CreditCard },
   { to: "/admin/reports", label: "Reports", icon: BarChart3 },
@@ -28,7 +29,7 @@ export function AdminShell({ children, title, subtitle }: { children: ReactNode;
     <div className="min-h-dvh bg-muted/40">
       <aside className="fixed inset-y-0 left-0 w-64 border-r bg-sidebar text-sidebar-foreground hidden lg:flex flex-col">
         <div className="h-16 px-5 flex items-center border-b border-sidebar-border">
-          <Logo to="/admin" />
+          <Logo to="/admin" height={44} className="max-w-[200px]" />
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto" aria-label="Admin">
           {items.map((it) => {
@@ -59,7 +60,7 @@ export function AdminShell({ children, title, subtitle }: { children: ReactNode;
       <div className="lg:pl-64 flex flex-col min-h-dvh">
         <header className="sticky top-0 z-20 h-16 bg-card border-b flex items-center gap-4 px-4 sm:px-8">
           <div className="lg:hidden">
-            <Logo to="/admin" />
+            <Logo to="/admin" height={40} className="max-w-[180px]" />
           </div>
           <div className="hidden lg:block min-w-0">
             <h1 className="text-lg font-semibold truncate">{title}</h1>

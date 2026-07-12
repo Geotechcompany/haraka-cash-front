@@ -17,7 +17,7 @@ export function LegalPageShell({
     <div className="min-h-dvh bg-background font-sans">
       <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-3xl items-center gap-4 px-4 sm:px-6">
-          <Logo height={40} className="max-w-[200px]" />
+          <Logo height={48} className="max-h-10 max-w-[180px] sm:max-h-12 sm:max-w-[220px]" />
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
             <Link

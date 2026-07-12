@@ -19,12 +19,13 @@ export function Logo({
 }) {
   const width = Math.round(height * 3.5);
   const imgClass =
-    "w-auto max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]";
+    "h-full w-auto max-h-full max-w-full object-contain object-left transition-transform group-hover:scale-[1.02]";
 
   return (
     <Link
       to={to}
       className={cn("inline-flex items-center group", className)}
+      style={{ height }}
       aria-label="HarakaCash home"
     >
       {variant === "white" ? (
@@ -34,7 +35,6 @@ export function Logo({
           height={height}
           width={width}
           className={imgClass}
-          style={{ height }}
         />
       ) : variant === "color" ? (
         <img
@@ -43,7 +43,6 @@ export function Logo({
           height={height}
           width={width}
           className={imgClass}
-          style={{ height }}
         />
       ) : (
         <>
@@ -53,7 +52,6 @@ export function Logo({
             height={height}
             width={width}
             className={cn(imgClass, "dark:hidden")}
-            style={{ height }}
           />
           <img
             src="/logo-white.png"
@@ -62,7 +60,6 @@ export function Logo({
             height={height}
             width={width}
             className={cn(imgClass, "hidden dark:block")}
-            style={{ height }}
           />
         </>
       )}

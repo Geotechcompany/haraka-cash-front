@@ -94,7 +94,7 @@ function AssessmentPage() {
           </ul>
 
           <p className="mt-6 text-xs text-muted-foreground text-center">
-            HarakaCash uses a responsible internal assessment. We do not access official credit bureau systems in this demo.
+            This is an initial eligibility review. After you accept and pay the processing fee, our team runs CRB (credit bureau) checks before disbursement.
           </p>
         </div>
       </div>

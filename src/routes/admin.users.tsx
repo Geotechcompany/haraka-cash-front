@@ -75,8 +75,15 @@ function AdminUsersPage() {
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{user.email || user.phone}</p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {user.applicationCount} applications · {kes(user.totalBorrowed)}
+                  {user.applicationCount} applications · {kes(user.totalBorrowed)} · credit{" "}
+                  {kes(user.availableCredit)}
                 </p>
+                {(user.referralCreditsEarned > 0 || user.referralCount > 0) && (
+                  <p className="text-xs text-primary truncate">
+                    Referral bonus {kes(user.referralCreditsEarned)} · {user.referralCount}{" "}
+                    invites
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">Score</p>

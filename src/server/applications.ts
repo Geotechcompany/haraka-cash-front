@@ -17,11 +17,16 @@ async function ensureUser(clerkId: string) {
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
   const existing = await db.collection<UserRecord>("users").findOne({ clerkId });
-  if (existing) return existing;
+  if (existing) {
+    const { ensureReferralCode } = await import("@/server/referrals");
+    return ensureReferralCode(existing);
+  }
 
   const clerk = await clerkClient();
   const profile = await clerk.users.getUser(clerkId).catch(() => null);
   const now = new Date();
+  const { allocateReferralCodeForNewUser } = await import("@/server/referrals");
+  const referralCode = await allocateReferralCodeForNewUser();
   const doc: UserRecord = {
     clerkId,
     email: profile?.emailAddresses[0]?.emailAddress,
@@ -30,6 +35,9 @@ async function ensureUser(clerkId: string) {
     phone: profile?.phoneNumbers[0]?.phoneNumber,
     eligibilityScore: 0,
     availableCredit: 0,
+    referralCode,
+    referralCreditsEarned: 0,
+    referralCount: 0,
     profileComplete: 0,
     createdAt: now,
     updatedAt: now,
