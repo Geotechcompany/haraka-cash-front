@@ -2,7 +2,8 @@
 const DEFAULT_BASE_URL = "https://smplypay.com";
 
 const DEFAULT_PATHS = {
-  wallet: "/v1/wallet/balance",
+  /** Postman: GET /api/v1/provider-one/wallet/{walletCode}/balance */
+  wallet: "/api/v1/provider-one/wallet/{projectCode}/balance",
   stk: "/api/v1/provider-one/externalstk",
   withdraw: "/api/v1/provider-one/externalb2c",
 } as const;
@@ -15,6 +16,7 @@ type SmplyRequestOptions = {
 export type SmplyWalletBalance = {
   balance: number;
   currency: string;
+  available: boolean;
   raw: unknown;
 };
 
@@ -100,6 +102,23 @@ function getProjectCode() {
   return projectCode;
 }
 
+/** Resolve wallet balance path; `{projectCode}` is replaced with SMPLY_PAY_PROJECT_CODE. */
+export function getWalletBalancePath(projectCode = getProjectCode()) {
+  const template = getApiPath("wallet");
+  if (template.includes("{projectCode}")) {
+    return template.replaceAll("{projectCode}", encodeURIComponent(projectCode));
+  }
+  // Legacy override without placeholder — append wallet code segment if it looks like the Postman base.
+  if (/\/wallet\/?$/i.test(template.replace(/\/$/, ""))) {
+    return `${template.replace(/\/$/, "")}/${encodeURIComponent(projectCode)}/balance`;
+  }
+  if (template.includes("projectCode=")) {
+    return template;
+  }
+  const separator = template.includes("?") ? "&" : "?";
+  return `${template}${separator}projectCode=${encodeURIComponent(projectCode)}`;
+}
+
 /** SMPLY Pay STK docs use local 07… numbers, not 254… */
 export function toSmplyPhoneNumber(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -114,6 +133,7 @@ export function getSmplyPayConfigSummary() {
   const clientId = process.env.SMPLY_PAY_CLIENT_ID;
   const projectCode = process.env.SMPLY_PAY_PROJECT_CODE;
   const withdrawPath = getApiPath("withdraw");
+  const walletPath = projectCode ? getWalletBalancePath(projectCode) : getApiPath("wallet");
   return {
     baseUrl: getBaseUrl(),
     apiKeySet: Boolean(key),
@@ -125,12 +145,13 @@ export function getSmplyPayConfigSummary() {
     callbackUrl: getCallbackUrl("/api/webhooks/smply-pay"),
     authStyle: getAuthStyle(),
     paths: {
-      wallet: getApiPath("wallet"),
+      wallet: walletPath,
       stk: getApiPath("stk"),
       withdraw: withdrawPath,
     },
     stkUrl: getStkUrl(),
     withdrawUrl: `${getBaseUrl()}${withdrawPath}`,
+    walletUrl: `${getBaseUrl()}${walletPath}`,
   };
 }
 
@@ -265,15 +286,104 @@ function pickNumber(data: Record<string, unknown>, keys: string[]) {
 }
 
 export async function getSmplyWalletBalance(): Promise<SmplyWalletBalance> {
-  const projectCode = getProjectCode();
-  const walletPath = getApiPath("wallet");
-  const separator = walletPath.includes("?") ? "&" : "?";
-  const pathWithProject = `${walletPath}${separator}projectCode=${encodeURIComponent(projectCode)}`;
-  const raw = await smplyRequest<Record<string, unknown>>(pathWithProject);
-  const balance =
-    pickNumber(raw, ["balance", "available_balance", "wallet_balance", "amount"]) ?? 0;
-  const currency = pickString(raw, ["currency", "currency_code"]) ?? "KES";
-  return { balance, currency, raw };
+  const path = getWalletBalancePath();
+  try {
+    const raw = await smplyRequest<Record<string, unknown>>(path);
+    const nested =
+      raw.data && typeof raw.data === "object" ? (raw.data as Record<string, unknown>) : undefined;
+    const balance =
+      pickNumber(raw, ["balance", "available_balance", "wallet_balance", "amount"]) ??
+      (nested
+        ? pickNumber(nested, ["balance", "available_balance", "wallet_balance", "amount"])
+        : undefined);
+    if (balance === undefined) {
+      return { balance: 0, currency: "KES", available: false, raw };
+    }
+    const currency =
+      pickString(raw, ["currency", "currency_code"]) ??
+      (nested ? pickString(nested, ["currency", "currency_code"]) : undefined) ??
+      "KES";
+    return { balance, currency, available: true, raw };
+  } catch {
+    return { balance: 0, currency: "KES", available: false, raw: null };
+  }
+}
+
+/** Map provider B2C JSON into status + user-facing copy (never echo bare "Success"). */
+export function interpretSmplyWithdrawResponse(input: {
+  reference: string;
+  raw: Record<string, unknown>;
+}): SmplyWithdrawResult {
+  const nested =
+    input.raw.data && typeof input.raw.data === "object"
+      ? (input.raw.data as Record<string, unknown>)
+      : undefined;
+  const providerRef =
+    pickString(input.raw, [
+      "transaction_id",
+      "withdrawal_id",
+      "ConversationID",
+      "OriginatorConversationID",
+      "order_number",
+      "orderNumber",
+      "id",
+    ]) ??
+    (nested
+      ? pickString(nested, [
+          "transaction_id",
+          "withdrawal_id",
+          "ConversationID",
+          "OriginatorConversationID",
+          "order_number",
+          "orderNumber",
+          "id",
+        ])
+      : undefined);
+
+  const providerMessage = pickString(input.raw, [
+    "message",
+    "ResponseDescription",
+    "CustomerMessage",
+    "error",
+  ]);
+  const statusValue =
+    pickString(input.raw, ["status", "state"]) ??
+    (nested ? pickString(nested, ["status", "state"]) : undefined);
+
+  const failed =
+    statusValue === "failed" ||
+    statusValue === "cancelled" ||
+    (typeof providerMessage === "string" &&
+      /insufficient|no.?funds|low.?balance|failed|error|denied/i.test(providerMessage));
+
+  // Provider "Success" / code 1 only means the request was accepted — payout is still pending.
+  const completed =
+    !failed &&
+    (statusValue === "completed" ||
+      statusValue === "paid" ||
+      (statusValue === "success" && Boolean(providerRef)));
+
+  const status: SmplyWithdrawResult["status"] = failed
+    ? "failed"
+    : completed
+      ? "success"
+      : "pending";
+
+  const message = failed
+    ? providerMessage && !/^success$/i.test(providerMessage.trim())
+      ? providerMessage
+      : "Withdrawal failed. Check wallet balance and try again."
+    : status === "success"
+      ? "Withdrawal completed."
+      : "Withdrawal submitted. Waiting for M-Pesa confirmation — this is not a paid-out confirmation.";
+
+  return {
+    reference: input.reference,
+    providerRef,
+    status,
+    message,
+    raw: input.raw,
+  };
 }
 
 export async function initiateProcessingFeeStkPush(input: {
@@ -335,32 +445,7 @@ export async function initiateSmplyWithdrawal(input: {
     }),
   });
 
-  const providerRef = pickString(raw, [
-    "transaction_id",
-    "withdrawal_id",
-    "ConversationID",
-    "OriginatorConversationID",
-    "order_number",
-    "orderNumber",
-    "id",
-  ]);
-  const message = pickString(raw, ["message", "ResponseDescription", "CustomerMessage"]);
-  const statusValue = pickString(raw, ["status", "state"]);
-  // B2C "success" usually means the payout was accepted — confirm via webhook when present.
-  const status: SmplyWithdrawResult["status"] =
-    statusValue === "failed" || statusValue === "cancelled"
-      ? "failed"
-      : statusValue === "success" || statusValue === "completed"
-        ? "success"
-        : "pending";
-
-  return {
-    reference: input.reference,
-    providerRef,
-    status,
-    message,
-    raw,
-  } satisfies SmplyWithdrawResult;
+  return interpretSmplyWithdrawResponse({ reference: input.reference, raw });
 }
 
 export function parseSmplyWebhook(payload: unknown) {

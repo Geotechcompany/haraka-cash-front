@@ -1,11 +1,10 @@
 import { loadProjectEnv } from "./load-env";
-import { getSmplyAuthHeaders } from "../src/lib/smply-pay.server";
+import { getSmplyAuthHeaders, getWalletBalancePath } from "../src/lib/smply-pay.server";
 
 loadProjectEnv({ quiet: true });
 
 const apiKey = process.env.SMPLY_PAY_API_KEY;
 const baseUrl = (process.env.SMPLY_PAY_API_BASE ?? "https://smplypay.com").replace(/\/$/, "");
-const walletPath = process.env.SMPLY_PAY_WALLET_PATH ?? "/v1/wallet/balance";
 const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
 function fail(message: string) {
@@ -30,6 +29,8 @@ async function testDns(host: string) {
 }
 
 async function testWalletBalance() {
+  const walletPath = getWalletBalancePath();
+  console.log(`  GET ${baseUrl}${walletPath}`);
   const response = await fetch(`${baseUrl}${walletPath}`, {
     headers: {
       ...getSmplyAuthHeaders(),

@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildStkPushBody, buildWithdrawBody, toSmplyPhoneNumber } from "@/lib/smply-pay.server";
+import {
+  buildStkPushBody,
+  buildWithdrawBody,
+  getWalletBalancePath,
+  interpretSmplyWithdrawResponse,
+  toSmplyPhoneNumber,
+} from "@/lib/smply-pay.server";
 
 test("toSmplyPhoneNumber normalizes 254 and bare 9-digit to local 07…", () => {
   assert.equal(toSmplyPhoneNumber("254757344328"), "0757344328");
@@ -37,11 +43,14 @@ test("buildWithdrawBody defaults remarks when omitted", () => {
     reference: "WD-DEFAULT",
   });
   assert.equal(withdraw.remarks, "withdrawal");
-  assert.notDeepEqual(withdraw, buildStkPushBody({
-    phone: "0757344328",
-    amount: 1,
-    reference: "WD-DEFAULT",
-  }));
+  assert.notDeepEqual(
+    withdraw,
+    buildStkPushBody({
+      phone: "0757344328",
+      amount: 1,
+      reference: "WD-DEFAULT",
+    }),
+  );
 });
 
 test("buildWithdrawBody rejects missing project code", () => {
@@ -54,5 +63,33 @@ test("buildWithdrawBody rejects missing project code", () => {
         reference: "WD-MISSING",
       }),
     /SMPLY_PAY_PROJECT_CODE/,
+  );
+});
+
+test("interpretSmplyWithdrawResponse treats bare Success as pending, not paid", () => {
+  const result = interpretSmplyWithdrawResponse({
+    reference: "WD-1",
+    raw: { code: 1, message: "Success", data: "" },
+  });
+  assert.equal(result.status, "pending");
+  assert.match(result.message, /Waiting for M-Pesa/i);
+  assert.notEqual(result.message, "Success");
+});
+
+test("interpretSmplyWithdrawResponse flags insufficient-funds wording as failed", () => {
+  const result = interpretSmplyWithdrawResponse({
+    reference: "WD-2",
+    raw: { message: "Insufficient wallet balance" },
+  });
+  assert.equal(result.status, "failed");
+  assert.match(result.message, /Insufficient/i);
+});
+
+test("getWalletBalancePath uses Postman wallet code segment", () => {
+  process.env.SMPLY_PAY_PROJECT_CODE = "WLT-CD-1MRWANZ";
+  delete process.env.SMPLY_PAY_WALLET_PATH;
+  assert.equal(
+    getWalletBalancePath(),
+    "/api/v1/provider-one/wallet/WLT-CD-1MRWANZ/balance",
   );
 });

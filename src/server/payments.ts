@@ -35,7 +35,12 @@ export const getWalletBalance = createServerFn({ method: "GET" }).handler(async 
   await requireAdmin();
   const { getSmplyWalletBalance } = await import("@/lib/smply-pay.server");
   const wallet = await getSmplyWalletBalance();
-  return { balance: wallet.balance, currency: wallet.currency, raw: null };
+  return {
+    balance: wallet.balance,
+    currency: wallet.currency,
+    available: wallet.available,
+    raw: null,
+  };
 });
 
 export const listPaymentTransactions = createServerFn({ method: "GET" }).handler(async () => {
@@ -163,10 +168,17 @@ export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
     const reference = paymentReference("WD");
-    const { normalizeKenyanPhone, initiateSmplyWithdrawal } =
+    const { normalizeKenyanPhone, initiateSmplyWithdrawal, getSmplyWalletBalance } =
       await import("@/lib/smply-pay.server");
     const phone = normalizeKenyanPhone(data.phone);
     const now = new Date();
+
+    const wallet = await getSmplyWalletBalance();
+    if (wallet.available && wallet.balance < data.amount) {
+      throw new Error(
+        `Insufficient wallet balance (KES ${wallet.balance.toLocaleString("en-KE")} available). Fund the SMPLY Pay wallet before withdrawing.`,
+      );
+    }
 
     const provider = await initiateSmplyWithdrawal({
       phone,
@@ -174,6 +186,10 @@ export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
       reference,
       description: "HarakaCash admin wallet withdrawal",
     });
+
+    if (provider.status === "failed") {
+      throw new Error(provider.message ?? "Withdrawal failed.");
+    }
 
     const payment: PaymentRecord = {
       reference,
@@ -200,7 +216,9 @@ export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
     return {
       reference,
       status: provider.status,
-      message: provider.message ?? "Withdrawal initiated to M-Pesa.",
+      message: provider.message ?? "Withdrawal submitted. Waiting for M-Pesa confirmation.",
+      walletAvailable: wallet.available,
+      walletBalance: wallet.available ? wallet.balance : undefined,
     };
   });
 

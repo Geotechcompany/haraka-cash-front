@@ -21,7 +21,12 @@ export const Route = createFileRoute("/admin/payments")({
   loader: async () => {
     const [payments, wallet] = await Promise.all([
       listPaymentTransactions(),
-      getWalletBalance().catch(() => ({ balance: 0, currency: "KES", raw: null })),
+      getWalletBalance().catch(() => ({
+        balance: 0,
+        currency: "KES",
+        available: false,
+        raw: null,
+      })),
     ]);
     return { payments, wallet };
   },
@@ -59,7 +64,13 @@ function AdminPaymentsPage() {
           amount: Number(amount),
         },
       });
-      toast.success(result.message);
+      if (result.status === "success") {
+        toast.success(result.message);
+      } else {
+        toast.message(result.message, {
+          description: result.reference ? `Ref ${result.reference}` : undefined,
+        });
+      }
       window.location.reload();
     } catch (error) {
       const raw = error instanceof Error ? error.message : "Withdrawal failed";
@@ -77,7 +88,12 @@ function AdminPaymentsPage() {
       subtitle="M-Pesa collections, wallet balance, and admin withdrawals."
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Wallet balance" value={kes(wallet.balance)} icon={Wallet} tone="primary" />
+        <StatCard
+          label="Wallet balance"
+          value={wallet.available ? kes(wallet.balance) : "Unavailable"}
+          icon={Wallet}
+          tone="primary"
+        />
         <StatCard
           label="Fees collected"
           value={kes(feesToday)}
@@ -108,6 +124,17 @@ function AdminPaymentsPage() {
             <p className="text-sm text-muted-foreground mt-1">
               Send funds from your SMPLY Pay wallet to an M-Pesa number.
             </p>
+            {!wallet.available && (
+              <p className="mt-2 text-xs text-warning-foreground">
+                Wallet balance could not be loaded from SMPLY Pay. A green provider reply only means
+                the request was accepted — not that funds left the wallet.
+              </p>
+            )}
+            {wallet.available && wallet.balance <= 0 && (
+              <p className="mt-2 text-xs text-destructive">
+                Wallet balance is KES 0. Fund the wallet before withdrawing.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="withdraw-phone">M-Pesa number</Label>
@@ -134,7 +161,9 @@ function AdminPaymentsPage() {
           </div>
           <Button
             type="submit"
-            disabled={withdrawing}
+            disabled={
+              withdrawing || (wallet.available && wallet.balance <= 0)
+            }
             className="w-full h-11 rounded-xl gradient-brand text-white font-semibold"
           >
             {withdrawing ? "Processing..." : "Withdraw to M-Pesa"}

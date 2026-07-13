@@ -212,9 +212,11 @@ async function probeWithdrawEndpoints(
   }
 }
 
-async function probeWalletEndpoints(baseUrl: string, configuredPath: string) {
+async function probeWalletEndpoints(baseUrl: string, configuredPath: string, projectCode: string) {
   const paths = [
     configuredPath,
+    `/api/v1/provider-one/wallet/${encodeURIComponent(projectCode)}/balance`,
+    `/api/v1/provider-one/wallet/${projectCode}/balance`,
     "/api/v1/provider-one/balance",
     "/api/v1/provider-one/wallet",
     "/api/v1/wallet/balance",
@@ -250,7 +252,9 @@ async function probeWalletEndpoints(baseUrl: string, configuredPath: string) {
     }
   }
   if (!found) {
-    fail("All probed wallet paths returned 404 — set SMPLY_PAY_WALLET_PATH from SMPLY Pay support.");
+    fail(
+      "All probed wallet paths returned 404 — expected /api/v1/provider-one/wallet/{walletCode}/balance",
+    );
   }
   return found;
 }
@@ -280,6 +284,7 @@ async function main() {
   info("Withdraw URL", config.withdrawUrl);
   info("Auth style", config.authStyle);
   info("Wallet path", config.paths.wallet);
+  info("Wallet URL", config.walletUrl ?? "(n/a)");
   console.log();
 
   if (!config.projectCode) {
@@ -295,7 +300,7 @@ async function main() {
   if (config.authStyle === "client-id" && !config.clientIdSet) {
     console.log("\nSkipping wallet probe — set SMPLY_PAY_CLIENT_ID for client-id auth.");
   } else {
-    await probeWalletEndpoints(config.baseUrl, config.paths.wallet);
+    await probeWalletEndpoints(config.baseUrl, config.paths.wallet, config.projectCode);
   }
 
   const phone = args.phone ?? "0700000000";
