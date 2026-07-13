@@ -6,12 +6,13 @@ import { StatCard } from "@/components/ui-extras/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CreditCard, TrendingUp, Wallet, ArrowDownToLine } from "lucide-react";
+import { ArrowUpFromLine, CreditCard, TrendingUp, Wallet } from "lucide-react";
 import { kes } from "@/lib/loan";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   getWalletBalance,
+  initiateAdminDeposit,
   initiateAdminWithdrawal,
   listPaymentTransactions,
 } from "@/server/payments";
@@ -42,17 +43,51 @@ const statusStyles: Record<string, string> = {
 
 function AdminPaymentsPage() {
   const { payments, wallet } = Route.useLoaderData();
+  const deposit = useServerFn(initiateAdminDeposit);
   const withdraw = useServerFn(initiateAdminWithdrawal);
-  const [phone, setPhone] = useState("");
-  const [amount, setAmount] = useState("5000");
+
+  const [depositPhone, setDepositPhone] = useState("");
+  const [depositAmount, setDepositAmount] = useState("5");
+  const [depositing, setDepositing] = useState(false);
+
+  const [withdrawPhone, setWithdrawPhone] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("5000");
   const [withdrawing, setWithdrawing] = useState(false);
 
-  const feesToday = payments
+  const feesCollected = payments
     .filter((p) => p.kind === "processing_fee" && p.status === "success")
     .reduce((sum, p) => sum + p.amount, 0);
-  const withdrawalsToday = payments
+  const depositsCollected = payments
+    .filter((p) => p.kind === "deposit" && p.status === "success")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const withdrawalsPaid = payments
     .filter((p) => p.kind === "withdrawal" && p.status === "success")
     .reduce((sum, p) => sum + p.amount, 0);
+
+  const stripServerPrefix = (raw: string) =>
+    raw.replace(/^Server Error\s*/i, "").trim() || raw;
+
+  const handleDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDepositing(true);
+    try {
+      const result = await deposit({
+        data: {
+          phone: depositPhone,
+          amount: Number(depositAmount),
+        },
+      });
+      toast.message(result.message, {
+        description: result.reference ? `Ref ${result.reference}` : undefined,
+      });
+      window.location.reload();
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "Deposit failed";
+      toast.error(stripServerPrefix(raw));
+    } finally {
+      setDepositing(false);
+    }
+  };
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +95,8 @@ function AdminPaymentsPage() {
     try {
       const result = await withdraw({
         data: {
-          phone,
-          amount: Number(amount),
+          phone: withdrawPhone,
+          amount: Number(withdrawAmount),
         },
       });
       if (result.status === "success") {
@@ -74,9 +109,7 @@ function AdminPaymentsPage() {
       window.location.reload();
     } catch (error) {
       const raw = error instanceof Error ? error.message : "Withdrawal failed";
-      // TanStack often prefixes thrown server messages with "Server Error".
-      const message = raw.replace(/^Server Error\s*/i, "").trim() || raw;
-      toast.error(message);
+      toast.error(stripServerPrefix(raw));
     } finally {
       setWithdrawing(false);
     }
@@ -85,7 +118,7 @@ function AdminPaymentsPage() {
   return (
     <AdminShell
       title="Payments"
-      subtitle="M-Pesa collections, wallet balance, and admin withdrawals."
+      subtitle="M-Pesa deposits, collections, wallet balance, and withdrawals."
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
@@ -96,79 +129,118 @@ function AdminPaymentsPage() {
         />
         <StatCard
           label="Fees collected"
-          value={kes(feesToday)}
+          value={kes(feesCollected)}
           icon={CreditCard}
           tone="success"
           delay={0.05}
         />
         <StatCard
-          label="Withdrawn"
-          value={kes(withdrawalsToday)}
-          icon={TrendingUp}
-          tone="warning"
+          label="Deposits"
+          value={kes(depositsCollected)}
+          icon={ArrowUpFromLine}
+          tone="success"
           delay={0.1}
         />
         <StatCard
-          label="Transactions"
-          value={String(payments.length)}
-          icon={ArrowDownToLine}
-          tone="default"
+          label="Withdrawn"
+          value={kes(withdrawalsPaid)}
+          icon={TrendingUp}
+          tone="warning"
           delay={0.15}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <form onSubmit={handleWithdraw} className="card-soft p-6 space-y-4 h-fit">
-          <div>
-            <p className="font-semibold">Withdraw funds</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Send funds from your SMPLY Pay wallet to an M-Pesa number.
-            </p>
-            {!wallet.available && (
-              <p className="mt-2 text-xs text-warning-foreground">
-                Wallet balance could not be loaded from SMPLY Pay. A green provider reply only means
-                the request was accepted — not that funds left the wallet.
+        <div className="space-y-6">
+          <form onSubmit={handleDeposit} className="card-soft p-6 space-y-4">
+            <div>
+              <p className="font-semibold">Deposit funds</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Collect money into the SMPLY Pay wallet via M-Pesa STK push.
               </p>
-            )}
-            {wallet.available && wallet.balance <= 0 && (
-              <p className="mt-2 text-xs text-destructive">
-                Wallet balance is KES 0. Fund the wallet before withdrawing.
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="deposit-phone">M-Pesa number</Label>
+              <Input
+                id="deposit-phone"
+                value={depositPhone}
+                onChange={(e) => setDepositPhone(e.target.value)}
+                className="h-11 rounded-xl"
+                placeholder="0712 345 678"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="deposit-amount">Amount (KES)</Label>
+              <Input
+                id="deposit-amount"
+                type="number"
+                min={1}
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                className="h-11 rounded-xl"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={depositing}
+              className="w-full h-11 rounded-xl gradient-brand text-white font-semibold"
+            >
+              {depositing ? "Sending STK..." : "Send deposit STK"}
+            </Button>
+          </form>
+
+          <form onSubmit={handleWithdraw} className="card-soft p-6 space-y-4">
+            <div>
+              <p className="font-semibold">Withdraw funds</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Send funds from your SMPLY Pay wallet to an M-Pesa number.
               </p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="withdraw-phone">M-Pesa number</Label>
-            <Input
-              id="withdraw-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="h-11 rounded-xl"
-              placeholder="0712 345 678"
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="withdraw-amount">Amount (KES)</Label>
-            <Input
-              id="withdraw-amount"
-              type="number"
-              min={1}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="h-11 rounded-xl"
-              required
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={
-              withdrawing || (wallet.available && wallet.balance <= 0)
-            }
-            className="w-full h-11 rounded-xl gradient-brand text-white font-semibold"
-          >
-            {withdrawing ? "Processing..." : "Withdraw to M-Pesa"}
-          </Button>
-        </form>
+              {!wallet.available && (
+                <p className="mt-2 text-xs text-warning-foreground">
+                  Wallet balance could not be loaded from SMPLY Pay. A green provider reply only means
+                  the request was accepted — not that funds left the wallet.
+                </p>
+              )}
+              {wallet.available && wallet.balance <= 0 && (
+                <p className="mt-2 text-xs text-destructive">
+                  Wallet balance is KES 0. Fund the wallet before withdrawing.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="withdraw-phone">M-Pesa number</Label>
+              <Input
+                id="withdraw-phone"
+                value={withdrawPhone}
+                onChange={(e) => setWithdrawPhone(e.target.value)}
+                className="h-11 rounded-xl"
+                placeholder="0712 345 678"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="withdraw-amount">Amount (KES)</Label>
+              <Input
+                id="withdraw-amount"
+                type="number"
+                min={1}
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                className="h-11 rounded-xl"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={withdrawing || (wallet.available && wallet.balance <= 0)}
+              className="w-full h-11 rounded-xl gradient-brand text-white font-semibold"
+            >
+              {withdrawing ? "Processing..." : "Withdraw to M-Pesa"}
+            </Button>
+          </form>
+        </div>
 
         <div className="card-soft overflow-hidden">
           <table className="w-full text-sm">

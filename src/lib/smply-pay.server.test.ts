@@ -5,6 +5,7 @@ import {
   buildStkPushBody,
   buildWithdrawBody,
   getWalletBalancePath,
+  interpretSmplyStkResponse,
   interpretSmplyWithdrawResponse,
   toSmplyPhoneNumber,
 } from "@/lib/smply-pay.server";
@@ -92,4 +93,43 @@ test("getWalletBalancePath uses Postman wallet code segment", () => {
     getWalletBalancePath(),
     "/api/v1/provider-one/wallet/WLT-CD-1MRWANZ/balance",
   );
+});
+
+test("buildStkPushBody uses DEP reference for admin deposits", () => {
+  process.env.SMPLY_PAY_PROJECT_CODE = "WLT-CD-1MRWANZ";
+  assert.deepEqual(
+    buildStkPushBody({
+      phone: "0757344328",
+      amount: 1,
+      reference: "DEP-TEST-1",
+    }),
+    {
+      phoneNumber: "0757344328",
+      amount: "1",
+      projectCode: "WLT-CD-1MRWANZ",
+      orderCode: "",
+      transactionId: "DEP-TEST-1",
+    },
+  );
+});
+
+test("interpretSmplyStkResponse treats bare Success as pending prompt, not paid", () => {
+  const result = interpretSmplyStkResponse({
+    reference: "DEP-1",
+    raw: { code: 1, message: "Success", data: "" },
+    pendingMessage:
+      "STK prompt sent. Enter M-Pesa PIN on the phone. This is not a deposit confirmation.",
+  });
+  assert.equal(result.status, "pending");
+  assert.match(result.message, /not a deposit confirmation/i);
+  assert.notEqual(result.message, "Success");
+});
+
+test("interpretSmplyStkResponse flags failed STK wording", () => {
+  const result = interpretSmplyStkResponse({
+    reference: "DEP-2",
+    raw: { message: "Invalid phone number", status: "failed" },
+  });
+  assert.equal(result.status, "failed");
+  assert.match(result.message, /Invalid phone/i);
 });

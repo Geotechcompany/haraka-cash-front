@@ -386,11 +386,77 @@ export function interpretSmplyWithdrawResponse(input: {
   };
 }
 
+/** Map provider STK JSON into status + copy (never treat bare "Success" as money received). */
+export function interpretSmplyStkResponse(input: {
+  reference: string;
+  raw: Record<string, unknown>;
+  pendingMessage?: string;
+}): SmplyStkPushResult {
+  const nested =
+    input.raw.data && typeof input.raw.data === "object"
+      ? (input.raw.data as Record<string, unknown>)
+      : undefined;
+  const providerRef =
+    pickString(input.raw, [
+      "transaction_id",
+      "checkout_request_id",
+      "CheckoutRequestID",
+      "order_number",
+      "orderNumber",
+      "id",
+    ]) ??
+    (nested
+      ? pickString(nested, [
+          "transaction_id",
+          "checkout_request_id",
+          "CheckoutRequestID",
+          "order_number",
+          "orderNumber",
+          "id",
+        ])
+      : undefined);
+
+  const providerMessage =
+    pickString(input.raw, ["message", "CustomerMessage", "ResponseDescription", "error"]) ??
+    (nested
+      ? pickString(nested, ["message", "CustomerMessage", "ResponseDescription", "error"])
+      : undefined);
+  const statusValue =
+    pickString(input.raw, ["status", "state"]) ??
+    (nested ? pickString(nested, ["status", "state"]) : undefined);
+
+  const failed =
+    statusValue === "failed" ||
+    statusValue === "cancelled" ||
+    (typeof providerMessage === "string" &&
+      /failed|error|denied|invalid|rejected/i.test(providerMessage) &&
+      !/^success$/i.test(providerMessage.trim()));
+
+  // Provider "Success" only means the STK prompt was accepted — payment is still pending.
+  const status: SmplyStkPushResult["status"] = failed ? "failed" : "pending";
+
+  const message = failed
+    ? providerMessage && !/^success$/i.test(providerMessage.trim())
+      ? providerMessage
+      : "STK push failed. Check the phone number and try again."
+    : (input.pendingMessage ??
+      "STK prompt sent. Enter M-Pesa PIN on the phone. This is not a payment confirmation.");
+
+  return {
+    reference: input.reference,
+    providerRef,
+    status,
+    message,
+    raw: input.raw,
+  };
+}
+
 export async function initiateProcessingFeeStkPush(input: {
   phone: string;
   amount: number;
   reference: string;
   description: string;
+  pendingMessage?: string;
 }) {
   const raw = await smplyRequest<Record<string, unknown>>(
     getApiPath("stk"),
@@ -406,27 +472,13 @@ export async function initiateProcessingFeeStkPush(input: {
     getStkUrl(),
   );
 
-  const providerRef = pickString(raw, [
-    "transaction_id",
-    "checkout_request_id",
-    "CheckoutRequestID",
-    "order_number",
-    "orderNumber",
-    "id",
-  ]);
-  const message = pickString(raw, ["message", "CustomerMessage", "ResponseDescription"]);
-  const statusValue = pickString(raw, ["status", "state"]);
-  // STK API "success" means the prompt was accepted — not that money was received.
-  const status: SmplyStkPushResult["status"] =
-    statusValue === "failed" || statusValue === "cancelled" ? "failed" : "pending";
-
-  return {
+  return interpretSmplyStkResponse({
     reference: input.reference,
-    providerRef,
-    status,
-    message,
     raw,
-  } satisfies SmplyStkPushResult;
+    pendingMessage:
+      input.pendingMessage ??
+      "Enter M-Pesa PIN on your phone. We'll continue when the fee is received.",
+  });
 }
 
 export async function initiateSmplyWithdrawal(input: {

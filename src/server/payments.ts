@@ -156,13 +156,73 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
     };
   });
 
-const withdrawInput = z.object({
+const walletTransferInput = z.object({
   phone: z.string().min(9),
   amount: z.number().positive().max(1_000_000),
 });
 
+export const initiateAdminDeposit = createServerFn({ method: "POST" })
+  .validator((data: unknown) => walletTransferInput.parse(data))
+  .handler(async ({ data }) => {
+    const adminId = await requireAdmin();
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const reference = paymentReference("DEP");
+    const { normalizeKenyanPhone, initiateProcessingFeeStkPush, getSmplyWalletBalance } =
+      await import("@/lib/smply-pay.server");
+    const phone = normalizeKenyanPhone(data.phone);
+    const now = new Date();
+
+    const provider = await initiateProcessingFeeStkPush({
+      phone,
+      amount: data.amount,
+      reference,
+      description: "HarakaCash admin wallet deposit",
+      pendingMessage:
+        "STK prompt sent. Enter M-Pesa PIN on the phone. This is not a deposit confirmation.",
+    });
+
+    if (provider.status === "failed") {
+      throw new Error(provider.message ?? "Deposit STK push failed.");
+    }
+
+    const payment: PaymentRecord = {
+      reference,
+      kind: "deposit",
+      amount: data.amount,
+      phone,
+      status: "pending",
+      provider: "smply_pay",
+      providerRef: provider.providerRef,
+      description: "Admin wallet deposit",
+      providerResponse: provider.raw,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await db.collection<PaymentRecord>("payments").insertOne(payment);
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
+    await logAuditEvent({
+      actor: adminId,
+      action: `Initiated deposit of KES ${data.amount}`,
+      target: reference,
+    });
+
+    const wallet = await getSmplyWalletBalance();
+
+    return {
+      reference,
+      status: "pending" as const,
+      message:
+        provider.message ??
+        "STK prompt sent. Enter M-Pesa PIN on the phone. This is not a deposit confirmation.",
+      walletAvailable: wallet.available,
+      walletBalance: wallet.available ? wallet.balance : undefined,
+    };
+  });
+
 export const initiateAdminWithdrawal = createServerFn({ method: "POST" })
-  .validator((data: unknown) => withdrawInput.parse(data))
+  .validator((data: unknown) => walletTransferInput.parse(data))
   .handler(async ({ data }) => {
     const adminId = await requireAdmin();
     const { getDb } = await import("@/lib/db");

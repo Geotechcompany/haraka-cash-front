@@ -1,4 +1,9 @@
-export type PaymentKind = "processing_fee" | "withdrawal" | "disbursement" | "repayment";
+export type PaymentKind =
+  | "processing_fee"
+  | "deposit"
+  | "withdrawal"
+  | "disbursement"
+  | "repayment";
 export type PaymentStatus = "pending" | "processing" | "success" | "failed";
 
 export type PaymentRecord = {
