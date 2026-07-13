@@ -178,85 +178,194 @@ function Landing() {
           </motion.div>
 
           <motion.div
-            className="relative mx-auto flex w-full max-w-[320px] items-center justify-center lg:ml-auto lg:mr-2 lg:max-w-[340px]"
-            initial={reduceMotion ? false : { y: 20 }}
-            animate={{ y: 0 }}
+            className="relative mx-auto flex w-full max-w-[300px] items-center justify-center [perspective:1400px] sm:max-w-[320px] lg:ml-auto lg:mr-0 lg:max-w-[360px]"
+            initial={reduceMotion ? false : { y: 28, opacity: 0.85 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={springSoft}
             aria-hidden
           >
-            {/* Phone shell */}
-            <div className="relative w-full aspect-[9/19.2] rounded-[2.6rem] bg-[#0b0d12] p-[10px] shadow-[0_40px_80px_-24px_rgba(0,0,0,0.55)] ring-1 ring-black/40">
-              <div className="absolute inset-[3px] rounded-[2.35rem] bg-gradient-to-b from-white/15 to-transparent opacity-40 pointer-events-none" />
-              <div className="relative flex h-full flex-col overflow-hidden rounded-[2.15rem] bg-[#f4f6fb] text-[oklch(0.2_0.03_264)]">
-                {/* Status bar */}
-                <div className="relative z-10 flex items-center justify-between px-6 pt-3.5 text-[11px] font-semibold tracking-tight text-foreground">
-                  <span className="tabular-nums">9:41</span>
-                  <div className="absolute left-1/2 top-2.5 h-[22px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-3.5 rounded-[2px] border border-foreground/80">
-                      <span className="ml-[1px] mt-[1px] block h-[5px] w-2 rounded-[1px] bg-foreground/80" />
-                    </span>
-                  </div>
-                </div>
+            {/* Soft floor shadow under the tilted device */}
+            <div className="pointer-events-none absolute bottom-[4%] left-[12%] right-[8%] h-12 rounded-[100%] bg-black/50 blur-2xl" />
 
-                {/* App screen */}
-                <div className="flex flex-1 flex-col px-4 pb-3 pt-4">
-                  <div className="flex items-center justify-between px-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Today
-                    </p>
-                    <img
-                      src="/favicon-mark.png"
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 rounded-full object-cover ring-1 ring-black/5"
-                    />
+            <motion.div
+              className="phone-hero-3d relative w-full aspect-[9/19.2] will-change-transform"
+              initial={
+                reduceMotion
+                  ? false
+                  : { rotateY: 32, rotateX: 14, rotateZ: -4, scale: 0.92 }
+              }
+              animate={
+                reduceMotion
+                  ? { rotateY: -12, rotateX: 4, rotateZ: -2, scale: 1 }
+                  : { rotateY: -18, rotateX: 6, rotateZ: -2.5, scale: 1 }
+              }
+              whileHover={
+                reduceMotion
+                  ? undefined
+                  : { rotateY: -8, rotateX: 2, rotateZ: -1, transition: { type: "spring", bounce: 0.15, duration: 0.55 } }
+              }
+              transition={springSoft}
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              {/* Phone shell */}
+              <div className="relative h-full w-full rounded-[2.6rem] bg-[#0b0d12] p-[10px] shadow-[0_50px_90px_-28px_rgba(0,0,0,0.7),12px_24px_40px_-16px_rgba(0,40,120,0.35)] ring-1 ring-black/50">
+                {/* Bezel specular for 3D edge read */}
+                <div className="pointer-events-none absolute inset-[3px] rounded-[2.35rem] bg-gradient-to-br from-white/25 via-transparent to-black/40 opacity-70" />
+                <div className="pointer-events-none absolute -left-1 top-[18%] h-[42%] w-1 rounded-full bg-white/10 blur-[1px]" />
+
+                <div className="theme-light-surface relative flex h-full flex-col overflow-hidden rounded-[2.15rem] bg-[#f4f6fb] text-foreground">
+                  {/* Status bar */}
+                  <div className="relative z-10 flex items-center justify-between px-5 pt-3.5 text-[11px] font-semibold tracking-tight text-foreground">
+                    <span className="tabular-nums">9:41</span>
+                    <div className="absolute left-1/2 top-2.5 h-[22px] w-[92px] -translate-x-1/2 rounded-full bg-black" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-3.5 rounded-[2px] border border-foreground/80">
+                        <span className="ml-[1px] mt-[1px] block h-[5px] w-2 rounded-[1px] bg-foreground/80" />
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="mt-4 flex-1 rounded-[1.35rem] bg-white p-5 shadow-[0_12px_40px_-18px_rgba(15,23,42,0.35)]">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Available credit
-                    </p>
-                    <motion.p
-                      className="mt-2 font-display text-[2rem] font-bold leading-none tracking-tight tabular-nums text-foreground"
-                      initial={reduceMotion ? false : { y: 8 }}
-                      animate={{ y: 0 }}
-                      transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.12 }}
-                    >
-                      {kes(45000)}
-                    </motion.p>
-                    <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <motion.div
-                        className="h-full origin-left rounded-full gradient-brand"
-                        initial={reduceMotion ? { scaleX: 0.72 } : { scaleX: 0.08 }}
-                        animate={{ scaleX: 0.72 }}
-                        transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.25 }}
+                  {/* App screen */}
+                  <div className="flex min-h-0 flex-1 flex-col px-3.5 pb-2.5 pt-3">
+                    <div className="flex items-center justify-between px-1">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Today
+                        </p>
+                        <p className="mt-0.5 text-[13px] font-semibold tracking-tight text-foreground">
+                          Hi, Amina
+                        </p>
+                      </div>
+                      <img
+                        src="/favicon-mark.png"
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 rounded-full object-cover ring-1 ring-black/5"
                       />
                     </div>
-                    <p className="mt-2 text-[11px] text-muted-foreground">Eligibility 72 / 100</p>
 
-                    <div className="mt-6 space-y-3.5 border-t border-border/80 pt-5">
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-muted-foreground">Active loan</span>
-                        <span className="font-semibold tabular-nums">{kes(15000)}</span>
+                    <div className="mt-3 rounded-[1.2rem] bg-card p-4 text-card-foreground shadow-[0_10px_32px_-16px_rgba(15,23,42,0.32)]">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Available credit
+                      </p>
+                      <motion.p
+                        className="mt-1.5 font-display text-[1.85rem] font-bold leading-none tracking-tight tabular-nums text-foreground"
+                        initial={reduceMotion ? false : { y: 8 }}
+                        animate={{ y: 0 }}
+                        transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.12 }}
+                      >
+                        {kes(45000)}
+                      </motion.p>
+                      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <motion.div
+                          className="h-full origin-left rounded-full gradient-brand"
+                          initial={reduceMotion ? { scaleX: 0.72 } : { scaleX: 0.08 }}
+                          animate={{ scaleX: 0.72 }}
+                          transition={{ ...springSoft, delay: reduceMotion ? 0 : 0.25 }}
+                        />
                       </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-muted-foreground">Due in</span>
-                        <span className="font-semibold">12 days</span>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-[11px] text-muted-foreground">Eligibility 72 / 100</p>
+                        <span className="rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                          Limit up
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/80 pt-4">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">Active loan</p>
+                          <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-foreground">
+                            {kes(15000)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-muted-foreground">Due in</p>
+                          <p className="mt-0.5 text-[13px] font-semibold text-foreground">12 days</p>
+                        </div>
                       </div>
                     </div>
+
+                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2.5 shadow-[0_6px_18px_-12px_rgba(15,23,42,0.28)]">
+                        <span className="grid h-7 w-7 place-items-center rounded-lg gradient-brand text-white">
+                          <Wallet className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-semibold text-foreground">Apply</p>
+                          <p className="truncate text-[10px] text-muted-foreground">New loan</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2.5 shadow-[0_6px_18px_-12px_rgba(15,23,42,0.28)]">
+                        <span className="grid h-7 w-7 place-items-center rounded-lg bg-muted text-foreground">
+                          <Banknote className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-semibold text-foreground">Repay</p>
+                          <p className="truncate text-[10px] text-muted-foreground">Via M-Pesa</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-2.5 min-h-0 flex-1 overflow-hidden rounded-[1.1rem] bg-card px-3.5 py-3 shadow-[0_6px_18px_-12px_rgba(15,23,42,0.28)]">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          Activity
+                        </p>
+                        <p className="text-[10px] font-medium text-primary">See all</p>
+                      </div>
+                      <ul className="mt-2.5 space-y-2.5">
+                        <li className="flex items-center gap-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:oklch(0.95_0.08_148)] text-[color:oklch(0.4_0.15_148)]">
+                            <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-medium text-foreground">
+                              M-Pesa payout
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Today · 10:14</p>
+                          </div>
+                          <p className="shrink-0 text-[12px] font-semibold tabular-nums text-[color:oklch(0.45_0.14_148)]">
+                            +{kes(15000)}
+                          </p>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-soft text-primary">
+                            <Wallet className="h-3.5 w-3.5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-medium text-foreground">
+                              Processing fee
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Yesterday</p>
+                          </div>
+                          <p className="shrink-0 text-[12px] font-semibold tabular-nums text-foreground">
+                            −{kes(450)}
+                          </p>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                            <Gift className="h-3.5 w-3.5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-medium text-foreground">
+                              Referral bonus
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">Mon</p>
+                          </div>
+                          <p className="shrink-0 text-[12px] font-semibold tabular-nums text-[color:oklch(0.45_0.14_148)]">
+                            +{kes(1000)}
+                          </p>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Home indicator */}
+                    <div className="mx-auto mt-2 mb-0.5 h-1 w-[34%] rounded-full bg-foreground/25" />
                   </div>
-
-                  <p className="mt-3 px-2 text-center text-[10px] leading-snug text-muted-foreground">
-                    Funds sent straight to your M-Pesa
-                  </p>
-
-                  {/* Home indicator */}
-                  <div className="mx-auto mt-auto mb-1 h-1 w-[34%] rounded-full bg-foreground/25" />
                 </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       </section>

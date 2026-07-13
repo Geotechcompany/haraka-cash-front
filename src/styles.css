@@ -174,6 +174,45 @@
   box-shadow: var(--shadow-soft);
 }
 
+/* Keep nested UI light when the page is in .dark (e.g. landing phone mockup). */
+@utility theme-light-surface {
+  color-scheme: light;
+  --background: oklch(0.995 0.002 264);
+  --foreground: oklch(0.18 0.03 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.03 264);
+  --muted: oklch(0.97 0.005 258);
+  --muted-foreground: oklch(0.52 0.02 258);
+  --border: oklch(0.93 0.006 258);
+  --secondary: oklch(0.97 0.01 258);
+  --secondary-foreground: oklch(0.22 0.04 264);
+  --accent: oklch(0.96 0.03 258);
+  --accent-foreground: oklch(0.35 0.15 258);
+  --primary: oklch(0.56 0.24 258);
+  --primary-soft: oklch(0.96 0.03 258);
+}
+
+@keyframes phone-hero-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+
+@utility phone-hero-3d {
+  transform-style: preserve-3d;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .phone-hero-3d {
+    animation: phone-hero-float 5.5s ease-in-out infinite;
+    animation-delay: 0.8s;
+  }
+}
+
 @utility gradient-brand {
   background-image: linear-gradient(135deg, oklch(0.56 0.24 258), oklch(0.62 0.2 220));
 }
