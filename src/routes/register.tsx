@@ -1,22 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { z } from "zod";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { ClerkSignUp } from "@/components/auth/clerk-auth-form";
 import { RedirectIfSignedIn } from "@/components/auth/auth-redirect";
 import { useEffect } from "react";
 import { persistReferralCode } from "@/lib/referral";
+import { parseRegisterSearch } from "@/lib/register-search";
 import { trackReferralClick } from "@/server/referral-clicks";
 
-const registerSearchSchema = z.object({
-  ref: z.string().optional(),
-});
-
 export const Route = createFileRoute("/register")({
-  validateSearch: registerSearchSchema,
+  validateSearch: (search) => parseRegisterSearch(search),
   head: () => ({ meta: [{ title: "Create account — HarakaCash" }] }),
-  loader: async ({ search }) => {
-    if (search.ref) {
-      await trackReferralClick({ data: { code: search.ref, source: "register" } });
+  // Loaders do not receive `search` — pass ref via loaderDeps (same pattern as /decision, /apply).
+  loaderDeps: ({ search }) => ({ ref: search?.ref }),
+  loader: async ({ deps }) => {
+    if (deps.ref) {
+      await trackReferralClick({ data: { code: deps.ref, source: "register" } });
     }
   },
   component: RegisterPage,
