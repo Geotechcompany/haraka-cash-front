@@ -5,6 +5,7 @@ slug: "harakacash-referral-program-benefits"
 publishedAt: "2026-01-24"
 author: "HarakaCash Team"
 tags: ["referrals", "harakacash", "rewards"]
+coverImage: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=80"
 ---
 
 Referrals reward you when friends join with your link and create an account. It is a limit tool, not free cash.

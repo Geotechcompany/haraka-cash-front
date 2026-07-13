@@ -5,6 +5,7 @@ slug: "what-harakacash-checks-before-payout"
 publishedAt: "2026-02-07"
 author: "HarakaCash Team"
 tags: ["approval", "crb", "harakacash"]
+coverImage: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&q=80"
 ---
 
 Accepting an offer is not the last step. Verification runs before M-Pesa sends money.

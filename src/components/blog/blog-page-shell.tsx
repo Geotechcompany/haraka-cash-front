@@ -59,7 +59,7 @@ export function BlogPageShell({
 
       <footer className="border-t">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-xs text-muted-foreground sm:px-6">
-          <p>© {new Date().getFullYear()} HarakaCash. Nairobi, Kenya.</p>
+          <p suppressHydrationWarning>© {new Date().getFullYear()} HarakaCash. Nairobi, Kenya.</p>
           <nav className="flex gap-4" aria-label="Footer">
             <Link to="/blog" className="hover:text-foreground">
               Blog

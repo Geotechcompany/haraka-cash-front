@@ -5,6 +5,7 @@ slug: "how-to-get-mpesa-loan-kenya"
 publishedAt: "2026-01-08"
 author: "HarakaCash Team"
 tags: ["m-pesa", "loans", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1563013546-824ae1b704d8?w=1200&q=80"
 ---
 
 You need cash on M-Pesa today, not next week. That is why digital lenders grew so fast in Kenya. The process is shorter than a bank branch visit, but the steps still matter if you want a clean repayment record.

@@ -5,6 +5,7 @@ slug: "first-time-borrower-tips-kenya"
 publishedAt: "2026-01-28"
 author: "HarakaCash Team"
 tags: ["first-time", "loans", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&q=80"
 ---
 
 Your first digital loan sets the tone for limits and pricing later. Slow down once, save money many times.

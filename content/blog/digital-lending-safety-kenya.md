@@ -5,6 +5,7 @@ slug: "digital-lending-safety-kenya"
 publishedAt: "2026-01-26"
 author: "HarakaCash Team"
 tags: ["safety", "digital-lending", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=1200&q=80"
 ---
 
 Fake lending apps steal data and PINs. Real lenders have verifiable processes. Learn the difference before you install anything.

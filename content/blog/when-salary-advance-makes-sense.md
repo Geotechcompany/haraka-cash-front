@@ -5,6 +5,7 @@ slug: "when-salary-advance-makes-sense"
 publishedAt: "2026-02-01"
 author: "HarakaCash Team"
 tags: ["salary-advance", "payroll", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1580519542036-c47f6190daa9?w=1200&q=80"
 ---
 
 Salary advance is not free money. It is pay day moved forward. Use it when delay costs more than fees.

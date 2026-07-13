@@ -5,6 +5,7 @@ slug: "avoid-late-fees-digital-loans"
 publishedAt: "2026-02-05"
 author: "HarakaCash Team"
 tags: ["late-fees", "repayment", "loans"]
+coverImage: "https://images.unsplash.com/photo-1506784362847-f7811541dad1?w=1200&q=80"
 ---
 
 Late fees are avoidable for most borrowers who treat due date like rent day.

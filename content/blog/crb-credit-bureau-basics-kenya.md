@@ -5,6 +5,7 @@ slug: "crb-credit-bureau-basics-kenya"
 publishedAt: "2026-01-16"
 author: "HarakaCash Team"
 tags: ["crb", "credit", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80"
 ---
 
 CRB is the Credit Reference Bureau. Lenders share loan performance data. Other lenders read that history when you apply.

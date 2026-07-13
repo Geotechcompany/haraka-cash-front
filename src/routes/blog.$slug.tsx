@@ -2,17 +2,17 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { BlogPageShell } from "@/components/blog/blog-page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getPostBySlug } from "@/lib/blog";
 import {
   buildArticleSchema,
   buildJsonLdGraph,
   buildOrganizationSchema,
   buildPageMeta,
 } from "@/lib/seo";
+import { getBlogPost } from "@/server/blog";
 
 export const Route = createFileRoute("/blog/$slug")({
-  loader: ({ params }) => {
-    const post = getPostBySlug(params.slug);
+  loader: async ({ params }) => {
+    const post = await getBlogPost({ data: params.slug });
     if (!post) throw notFound();
     return { post };
   },

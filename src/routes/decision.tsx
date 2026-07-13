@@ -314,7 +314,7 @@ function DecisionPage() {
           </p>
           {isPartialOffer ? (
             <p className="mt-2 text-sm text-muted-foreground">
-              Pay the processing fee on this offer via M-Pesa to continue.
+              Pay the processing fee on this offer via M-Pesa to for disbursement to be automatically released to your number.
             </p>
           ) : null}
         </div>

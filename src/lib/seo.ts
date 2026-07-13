@@ -118,18 +118,20 @@ export function buildArticleSchema({
   slug,
   publishedAt,
   author,
+  coverImage,
 }: {
   title: string;
   description: string;
   slug: string;
   publishedAt: string;
   author: string;
+  coverImage?: string;
 }) {
   return {
     "@type": "Article",
     headline: title,
     description,
-    image: [absoluteUrl(DEFAULT_OG_IMAGE)],
+    image: [coverImage ?? absoluteUrl(DEFAULT_OG_IMAGE)],
     author: { "@type": "Organization", name: author },
     publisher: {
       "@type": "Organization",

@@ -5,6 +5,7 @@ slug: "repaying-loans-on-time-kenya"
 publishedAt: "2026-01-18"
 author: "HarakaCash Team"
 tags: ["repayment", "m-pesa", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=1200&q=80"
 ---
 
 On-time repayment is the cheapest credit upgrade available. No fee beats it.

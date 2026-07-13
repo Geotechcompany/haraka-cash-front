@@ -1,22 +1,7 @@
 import matter from "gray-matter";
 import { marked } from "marked";
 
-export interface BlogPostFrontmatter {
-  title: string;
-  description: string;
-  slug: string;
-  publishedAt: string;
-  author: string;
-  tags: string[];
-}
-
-export interface BlogPostSummary extends BlogPostFrontmatter {
-  readingMinutes: number;
-}
-
-export interface BlogPost extends BlogPostSummary {
-  html: string;
-}
+import type { BlogPost, BlogPostFrontmatter, BlogPostSummary } from "@/lib/blog-types";
 
 const postModules = import.meta.glob("../../content/blog/*.md", {
   query: "?raw",

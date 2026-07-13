@@ -5,6 +5,7 @@ slug: "improve-loan-eligibility-harakacash"
 publishedAt: "2026-01-12"
 author: "HarakaCash Team"
 tags: ["eligibility", "loans", "harakacash"]
+coverImage: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&q=80"
 ---
 
 Eligibility is not luck. It is a picture built from what you submit and how you have borrowed before. You can improve that picture before you apply.

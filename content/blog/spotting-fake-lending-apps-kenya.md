@@ -5,6 +5,7 @@ slug: "spotting-fake-lending-apps-kenya"
 publishedAt: "2026-02-15"
 author: "HarakaCash Team"
 tags: ["safety", "scams", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1200&q=80"
 ---
 
 Scammers follow loan demand. They build slick apps that never pay out.

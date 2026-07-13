@@ -5,6 +5,7 @@ slug: "emergency-funds-mpesa-kenya"
 publishedAt: "2026-01-22"
 author: "HarakaCash Team"
 tags: ["emergency", "savings", "m-pesa"]
+coverImage: "https://images.unsplash.com/photo-1579621970793-5e0949638735?w=1200&q=80"
 ---
 
 Emergencies do not wait for pay day. An M-Pesa buffer reduces panic borrowing.

@@ -5,6 +5,7 @@ slug: "shop-owner-stock-financing-mpesa"
 publishedAt: "2026-02-13"
 author: "HarakaCash Team"
 tags: ["business", "stock", "m-pesa"]
+coverImage: "https://images.unsplash.com/photo-1441986300917-64676bd600d8?w=1200&q=80"
 ---
 
 Inventory loans work when stock turns fast enough to repay inside one month.

@@ -5,6 +5,7 @@ slug: "mpesa-loan-repayment-reminders"
 publishedAt: "2026-01-30"
 author: "HarakaCash Team"
 tags: ["repayment", "m-pesa", "reminders"]
+coverImage: "https://images.unsplash.com/photo-1512941937669-90a1b58d7cfe?w=1200&q=80"
 ---
 
 Reminders fail when they fire once on a busy day. Build a short system instead.

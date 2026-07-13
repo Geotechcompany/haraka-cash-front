@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-import { getSitemapBlogEntries } from "@/lib/blog";
+import { getSitemapBlogEntries } from "@/lib/blog.server";
 import { getSiteUrl } from "@/lib/seo";
 
 const PUBLIC_PATHS: { path: string; changefreq: string; priority: string }[] = [

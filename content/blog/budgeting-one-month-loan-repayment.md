@@ -5,6 +5,7 @@ slug: "budgeting-one-month-loan-repayment"
 publishedAt: "2026-02-11"
 author: "HarakaCash Team"
 tags: ["budgeting", "repayment", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&q=80"
 ---
 
 One-month loans are simple math tied to one pay cycle. Budget for the total due, not just principal.

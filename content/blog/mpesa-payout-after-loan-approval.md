@@ -5,6 +5,7 @@ slug: "mpesa-payout-after-loan-approval"
 publishedAt: "2026-02-09"
 author: "HarakaCash Team"
 tags: ["m-pesa", "disbursement", "loans"]
+coverImage: "https://images.unsplash.com/photo-1580619305216-7873e1c9edd1?w=1200&q=80"
 ---
 
 Approval feels instant. Payout follows operations steps you can predict.

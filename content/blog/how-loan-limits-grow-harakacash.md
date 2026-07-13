@@ -5,6 +5,7 @@ slug: "how-loan-limits-grow-harakacash"
 publishedAt: "2026-02-03"
 author: "HarakaCash Team"
 tags: ["limits", "harakacash", "credit"]
+coverImage: "https://images.unsplash.com/photo-1642796551110-655553a05442?w=1200&q=80"
 ---
 
 Limits start conservative. They climb when you prove you repay.

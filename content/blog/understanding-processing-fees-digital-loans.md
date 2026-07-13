@@ -5,6 +5,7 @@ slug: "understanding-processing-fees-digital-loans"
 publishedAt: "2026-01-14"
 author: "HarakaCash Team"
 tags: ["fees", "digital-lending", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1554224155-8d04d21c17df?w=1200&q=80"
 ---
 
 Processing fee is the line item borrowers ask about most. It is not hidden interest. It is the charge for moving your file through verification and payout.

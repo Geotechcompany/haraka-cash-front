@@ -5,6 +5,7 @@ slug: "salary-advance-vs-personal-loan-kenya"
 publishedAt: "2026-01-10"
 author: "HarakaCash Team"
 tags: ["salary-advance", "personal-loan", "kenya"]
+coverImage: "https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=1200&q=80"
 ---
 
 Both products pay to M-Pesa. Both show fees before you accept. The difference is what you are borrowing against and how you think about repayment.

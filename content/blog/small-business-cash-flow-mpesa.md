@@ -5,6 +5,7 @@ slug: "small-business-cash-flow-mpesa"
 publishedAt: "2026-01-20"
 author: "HarakaCash Team"
 tags: ["business", "cash-flow", "m-pesa"]
+coverImage: "https://images.unsplash.com/photo-1542744173-8e3601bb34ec?w=1200&q=80"
 ---
 
 Shop owners live in the gap between stock payment and sales. M-Pesa credit can cover that gap if you treat it as working capital, not income.

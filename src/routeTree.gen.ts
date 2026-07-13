@@ -30,6 +30,7 @@ import { Route as AssessmentRouteImport } from './routes/assessment'
 import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as RCodeRouteImport } from './routes/r.$code'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
@@ -151,6 +152,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BlogRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/blog/': typeof BlogIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
@@ -270,7 +277,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apply': typeof ApplyRoute
   '/assessment': typeof AssessmentRoute
-  '/blog': typeof BlogRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/decision': typeof DecisionRoute
   '/faq': typeof FaqRoute
@@ -300,6 +306,7 @@ export interface FileRoutesByTo {
   '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin': typeof AdminIndexRoute
+  '/blog': typeof BlogIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
@@ -339,6 +346,7 @@ export interface FileRoutesById {
   '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
+  '/blog/': typeof BlogIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
   '/api/admin/reports/$report/$format': typeof ApiAdminReportsReportFormatRoute
 }
@@ -379,6 +387,7 @@ export interface FileRouteTypes {
     | '/blog/$slug'
     | '/r/$code'
     | '/admin/'
+    | '/blog/'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
   fileRoutesByTo: FileRoutesByTo
@@ -386,7 +395,6 @@ export interface FileRouteTypes {
     | '/'
     | '/apply'
     | '/assessment'
-    | '/blog'
     | '/dashboard'
     | '/decision'
     | '/faq'
@@ -416,6 +424,7 @@ export interface FileRouteTypes {
     | '/blog/$slug'
     | '/r/$code'
     | '/admin'
+    | '/blog'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
   id:
@@ -454,6 +463,7 @@ export interface FileRouteTypes {
     | '/blog/$slug'
     | '/r/$code'
     | '/admin/'
+    | '/blog/'
     | '/api/webhooks/smply-pay'
     | '/api/admin/reports/$report/$format'
   fileRoutesById: FileRoutesById
@@ -634,6 +644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/': {
+      id: '/blog/'
+      path: '/'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof BlogRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -774,10 +791,12 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface BlogRouteChildren {
   BlogSlugRoute: typeof BlogSlugRoute
+  BlogIndexRoute: typeof BlogIndexRoute
 }
 
 const BlogRouteChildren: BlogRouteChildren = {
   BlogSlugRoute: BlogSlugRoute,
+  BlogIndexRoute: BlogIndexRoute,
 }
 
 const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
