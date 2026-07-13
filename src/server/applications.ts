@@ -279,6 +279,7 @@ export const createApplication = createServerFn({ method: "POST" })
     const quote = buildLoanQuote(data.amount, months, {
       monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
       minProcessingFee: lendingSettings.minProcessingFee,
+      feeSeed: applicationNumber,
     });
 
     const { toSmplyPhoneNumber } = await import("@/lib/smply-pay.server");
@@ -380,6 +381,7 @@ export const runAssessment = createServerFn({ method: "POST" })
         monthlyInterestRate: lendingSettings.monthlyInterestRate,
         automatedApprovals: lendingSettings.automatedApprovals,
         quoteMonthly: doc.quote?.monthly,
+        applicationNumber,
       },
       lendingSettings.quoteAiProvider,
     );
@@ -387,12 +389,11 @@ export const runAssessment = createServerFn({ method: "POST" })
     const { approved, status, eligibilityScore, steps, notes, decisionHint, eligible, approvedAmount, isPartialOffer } =
       clamped;
 
-    const offerQuote = approved
-      ? buildLoanQuote(approvedAmount, doc.months, {
-          monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
-          minProcessingFee: lendingSettings.minProcessingFee,
-        })
-      : doc.quote;
+    const offerQuote = buildLoanQuote(approvedAmount, doc.months, {
+      monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
+      minProcessingFee: lendingSettings.minProcessingFee,
+      feeSeed: applicationNumber,
+    });
 
     await db.collection<ApplicationRecord>("applications").updateOne(
       { applicationNumber },
@@ -401,21 +402,17 @@ export const runAssessment = createServerFn({ method: "POST" })
           status,
           eligibilityScore,
           riskScore: 100 - eligibilityScore,
-          approvedAmount: approved ? approvedAmount : 0,
+          approvedAmount,
           assessmentNotes: notes,
           assessmentSource: source,
-          ...(offerQuote
-            ? {
-                quote: {
-                  amount: offerQuote.amount,
-                  months: offerQuote.months,
-                  fee: offerQuote.fee,
-                  interest: offerQuote.interest,
-                  totalPayable: offerQuote.totalPayable,
-                  monthly: offerQuote.monthly,
-                },
-              }
-            : {}),
+          quote: {
+            amount: offerQuote.amount,
+            months: offerQuote.months,
+            fee: offerQuote.fee,
+            interest: offerQuote.interest,
+            totalPayable: offerQuote.totalPayable,
+            monthly: offerQuote.monthly,
+          },
           updatedAt: new Date(),
         },
       },
@@ -424,22 +421,18 @@ export const runAssessment = createServerFn({ method: "POST" })
     const { logAuditEvent } = await import("@/server/internal/audit-events");
     await logAuditEvent({
       actor: "credit-engine",
-      action: approved
-        ? isPartialOffer
-          ? `Approved partial offer ${approvedAmount} of ${doc.amount} (${source})`
-          : `Approved application (${source})`
-        : `Declined application (${source})`,
+      action: isPartialOffer
+        ? `Approved partial offer ${approvedAmount} of ${doc.amount} (${source})`
+        : `Approved application (${source})`,
       target: applicationNumber,
     });
     await db.collection("notifications").insertOne({
       clerkUserId,
-      title: approved ? "Offer ready" : "Application update",
-      body: approved
-        ? isPartialOffer
-          ? `Based on your profile we can offer ${approvedAmount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} of your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} request.`
-          : `Your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} loan has been pre-approved.`
-        : `Application ${applicationNumber} was not approved at this time.`,
-      type: approved ? "success" : "warning",
+      title: "Offer ready",
+      body: isPartialOffer
+        ? `Based on your profile we can offer ${approvedAmount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} of your ${doc.amount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} request.`
+        : `Your ${approvedAmount.toLocaleString("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 })} loan has been pre-approved.`,
+      type: "success",
       unread: true,
       createdAt: new Date(),
     });
@@ -447,8 +440,8 @@ export const runAssessment = createServerFn({ method: "POST" })
     return {
       applicationNumber,
       status,
-      approved,
-      approvedAmount: approved ? approvedAmount : 0,
+      approved: true,
+      approvedAmount,
       requestedAmount: doc.amount,
       isPartialOffer,
       eligibilityScore,

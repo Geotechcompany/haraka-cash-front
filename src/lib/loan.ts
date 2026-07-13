@@ -1,3 +1,5 @@
+import { seedUnit } from "@/lib/deterministic-seed";
+
 export const KES = new Intl.NumberFormat("en-KE", {
   style: "currency",
   currency: "KES",
@@ -12,22 +14,31 @@ export const num = (n: number) => new Intl.NumberFormat("en-KE").format(n);
 export const DEFAULT_MIN_PROCESSING_FEE = 150;
 
 /**
- * HarakaCash processing fee schedule (indicative).
- * Tiered flat fees per bracket, never below `minFee`.
+ * Processing fee from principal percentage + fixed component, with deterministic jitter.
+ * Same `seed` always yields the same fee (e.g. application number).
  */
 export function processingFee(
   amount: number,
   minFee: number = DEFAULT_MIN_PROCESSING_FEE,
+  seed?: string,
 ): number {
   const floor = Math.max(0, Math.round(minFee));
-  let fee: number;
-  if (amount <= 5000) fee = 150;
-  else if (amount <= 10000) fee = 250;
-  else if (amount <= 20000) fee = 500;
-  else if (amount <= 50000) fee = 1000;
-  else if (amount <= 100000) fee = 2000;
-  else fee = Math.round(amount * 0.022);
-  return Math.max(fee, floor);
+  const principal = Math.max(0, Math.round(amount));
+  if (principal <= 0) return floor;
+
+  const seedKey = seed ?? `fee:principal:${principal}`;
+  const ratePct = 1.2 + seedUnit(seedKey, 0) * 0.6;
+  const fixed = 25 + Math.floor(seedUnit(seedKey, 1) * 35);
+  let fee = Math.round(principal * (ratePct / 100) + fixed);
+
+  const jitter = 7 + Math.floor(seedUnit(seedKey, 2) * 86);
+  fee += (seedUnit(seedKey, 3) > 0.5 ? 1 : -1) * jitter;
+
+  if (fee % 100 === 0) fee += 17 + Math.floor(seedUnit(seedKey, 4) * 30);
+  if (fee % 50 === 0 && fee % 100 !== 0) fee += 13 + Math.floor(seedUnit(seedKey, 5) * 20);
+
+  const minWithJitter = floor + 10 + Math.floor(seedUnit(seedKey, 6) * 40);
+  return Math.max(fee, minWithJitter);
 }
 
 /** Simple monthly interest rate as a decimal (indicative fallback). */
@@ -45,6 +56,8 @@ export type LoanQuoteBreakdown = {
 export type BuildLoanQuoteOptions = {
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
+  /** Stable key (e.g. application number) for deterministic fee jitter. */
+  feeSeed?: string;
 };
 
 /**
@@ -69,7 +82,7 @@ export function buildLoanQuote(
   const minFee = options.minProcessingFee ?? DEFAULT_MIN_PROCESSING_FEE;
   const principal = Math.round(amount);
   const termMonths = Math.max(1, Math.round(months));
-  const fee = processingFee(principal, minFee);
+  const fee = processingFee(principal, minFee, options.feeSeed);
   const interest = Math.round(principal * (rate / 100) * termMonths);
   const totalPayable = principal + interest + fee;
   const monthly = Math.round(totalPayable / termMonths);

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { CheckCircle2, XCircle, Calendar, ArrowRight, Sparkles, Smartphone, Clock } from "lucide-react";
+import { CheckCircle2, Calendar, ArrowRight, Sparkles, Smartphone, Clock } from "lucide-react";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -189,7 +189,9 @@ function DecisionPage() {
     );
   }
 
-  const approved = application.status === "Approved";
+  const hasOffer =
+    application.status === "Approved" ||
+    ((application.approvedAmount ?? 0) > 0 && Boolean(application.quote));
 
   const schedule = Array.from({ length: quote.months }).map((_, i) => ({
     n: i + 1,
@@ -231,25 +233,18 @@ function DecisionPage() {
     }
   };
 
-  if (!approved) {
+  if (!hasOffer) {
     return (
       <AppShell>
         <div className="max-w-xl mx-auto text-center">
-          <motion.div initial={{ scale: 0.7 }} animate={{ scale: 1 }} className="mx-auto h-20 w-20 rounded-3xl bg-destructive/10 text-destructive grid place-items-center">
-            <XCircle className="h-10 w-10" />
+          <motion.div initial={{ scale: 0.7 }} animate={{ scale: 1 }} className="mx-auto h-20 w-20 rounded-3xl bg-muted text-muted-foreground grid place-items-center">
+            <Clock className="h-10 w-10" />
           </motion.div>
-          <h1 className="mt-6 text-3xl font-bold">Application not approved</h1>
-          <p className="mt-3 text-muted-foreground">Based on our current assessment, we're unable to offer you a loan at this time.</p>
-          <div className="mt-6 card-soft p-6 text-left">
-            <p className="text-sm font-semibold">How to improve eligibility</p>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-disc list-inside">
-              <li>Repay any existing loans on time</li>
-              <li>Increase your regular M-Pesa activity</li>
-              <li>Update your employment and income details</li>
-              <li>Try again after 30 days</li>
-            </ul>
-          </div>
-          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/dashboard">Back to dashboard</Link></Button>
+          <h1 className="mt-6 text-3xl font-bold">Decision pending</h1>
+          <p className="mt-3 text-muted-foreground">
+            Your application is still being processed. Complete the assessment or check back shortly.
+          </p>
+          <Button asChild className="mt-6 rounded-xl gradient-brand text-white h-11 px-6"><Link to="/dashboard">Go to dashboard</Link></Button>
         </div>
       </AppShell>
     );

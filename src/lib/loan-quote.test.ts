@@ -33,22 +33,50 @@ describe("kenya-format", () => {
   });
 });
 
+describe("processingFee", () => {
+  const seed = "HC-FEE-001";
+
+  it("is deterministic for the same seed", () => {
+    assert.equal(processingFee(12_340, 150, seed), processingFee(12_340, 150, seed));
+  });
+
+  it("scales with principal and avoids round hundreds", () => {
+    const fee5k = processingFee(5_000, 150, `${seed}:5k`);
+    const fee20k = processingFee(20_000, 150, `${seed}:20k`);
+    assert.ok(fee20k > fee5k);
+    assert.notEqual(fee20k % 100, 0);
+    assert.notEqual(fee5k % 100, 0);
+  });
+
+  it("never goes below minProcessingFee floor with jitter above it", () => {
+    const fee = processingFee(3_000, 400, seed);
+    assert.ok(fee >= 400);
+    assert.ok(fee <= 500);
+  });
+});
+
 describe("buildLoanQuote", () => {
-  it("matches fee schedule and interest math", () => {
-    const quote = buildLoanQuote(20_000, 3, 6);
-    assert.equal(quote.fee, processingFee(20_000));
+  const seed = "HC-QUOTE-001";
+
+  it("matches fee formula and interest math", () => {
+    const quote = buildLoanQuote(20_000, 3, {
+      monthlyInterestRatePercent: 6,
+      minProcessingFee: 150,
+      feeSeed: seed,
+    });
+    assert.equal(quote.fee, processingFee(20_000, 150, seed));
     assert.equal(quote.interest, Math.round(20_000 * 0.06 * 3));
     assert.equal(quote.totalPayable, quote.amount + quote.fee + quote.interest);
     assert.equal(quote.monthly, Math.round(quote.totalPayable / 3));
   });
 
-  it("never goes below minProcessingFee floor", () => {
-    assert.equal(processingFee(3_000, 400), 400);
+  it("uses feeSeed from options", () => {
     const quote = buildLoanQuote(3_000, 2, {
       monthlyInterestRatePercent: 6,
       minProcessingFee: 400,
+      feeSeed: seed,
     });
-    assert.equal(quote.fee, 400);
+    assert.equal(quote.fee, processingFee(3_000, 400, seed));
   });
 });
 

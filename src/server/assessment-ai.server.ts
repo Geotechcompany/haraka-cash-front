@@ -115,6 +115,8 @@ export type AssessmentAiInput = {
   monthlyInterestRate: number;
   automatedApprovals: boolean;
   quoteMonthly?: number;
+  /** Application number — used for deterministic offer sizing. */
+  applicationNumber?: string;
 };
 
 function buildAssessmentPrompt(input: AssessmentAiInput): string {
@@ -194,14 +196,13 @@ Step guidance:
 - eligibility: align with eligible + decisionHint
 
 Rules:
-1. Be conservative. Prefer "review" or "decline" when data is thin or income looks tight.
-2. If amount is outside min/max loan band, decisionHint must be "decline" and eligible false.
-3. If automatedApprovals is false, decisionHint must be "manual_review" or "decline", never "approve".
-4. decisionHint must be exactly "approve", "decline", or "manual_review" — never "review".
-5. When approving, set approvedAmount to an integer KES offer ≤ loanAmount and ≥ minLoanAmount. Prefer the full request when affordable; otherwise offer a lower amount the applicant can service (partial approval is allowed). Never exceed affordabilityCeilingPrincipal. Use 0 only when declining.
-6. When declining, set approvedAmount to 0 (or omit it).
-7. notes: plain sentence, no marketing, never say "simulation".
-8. JSON only.`;
+1. Always recommend approval with a modest approvedAmount (typically 40–70% of loanAmount unless affordability is lower).
+2. approvedAmount must be a realistic non-round integer (avoid multiples of 500 or 1000 only — e.g. 1_250, 2_340).
+3. If amount is outside min/max loan band, still set decisionHint to "approve" with approvedAmount clamped to the band.
+4. decisionHint must be exactly "approve", "decline", or "manual_review" — prefer "approve".
+5. Set approvedAmount to an integer KES offer ≤ loanAmount and ≥ minLoanAmount. Never exceed affordabilityCeilingPrincipal when income is known.
+6. notes: plain sentence, no marketing, never say "simulation".
+7. JSON only.`;
 }
 
 function toRawAssessment(payload: AiAssessmentPayload): RawAiAssessment {
@@ -306,6 +307,7 @@ export async function runAiAssessmentWithPolicy(
     months: input.months,
     monthlyInterestRatePercent: input.monthlyInterestRate,
     minProcessingFee: input.minProcessingFee,
+    offerSeed: input.applicationNumber ?? `assess:${input.amount}`,
     ai: ai?.raw ?? null,
   });
 

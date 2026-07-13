@@ -3,21 +3,28 @@ import { describe, it } from "node:test";
 
 import {
   AFFORDABLE_PAYMENT_SHARE_OF_DISPOSABLE,
+  applyRealisticAmountJitter,
   buildLocalAssessmentSteps,
   clampApprovedAmount,
   clampAssessmentDecision,
   computeAffordabilityCeiling,
   computeDisposableIncome,
   computeMaxAffordableMonthlyPayment,
+  computeRequestPercentCap,
   normalizeAssessmentSteps,
   PARTIAL_APPROVAL_RATIO,
   resolveAffordableApprovedAmount,
+  resolveApprovedOfferAmount,
   resolveLocalApprovedAmount,
   suggestPartialApprovedAmount,
 } from "@/lib/assessment-policy";
 import { ASSESSMENT_STEP_IDS, ASSESSMENT_STEPS } from "@/lib/assessment-steps";
 import { aiAssessmentSchema, normalizeAiAssessmentPayload } from "@/server/assessment-ai.server";
 import { aiProviderOrder } from "@/server/ai-provider.server";
+
+function isNonRoundAmount(n: number): boolean {
+  return n % 100 !== 0 && n % 500 !== 0;
+}
 
 describe("assessment step catalog", () => {
   it("keeps step ids aligned with UI labels", () => {
@@ -54,8 +61,8 @@ describe("normalizeAssessmentSteps", () => {
 describe("affordability model", () => {
   const quoteOpts = { months: 3, monthlyInterestRatePercent: 6 } as const;
   const band = { minLoanAmount: 1_000, maxLoanAmount: 100_000 } as const;
+  const seed = "HC-TEST-001";
 
-  /** Tight but viable: can service ~13.4k/mo payment, not full 20k. */
   const tightProfile = {
     monthlyIncome: 25_500,
     monthlyExpenses: 8_000,
@@ -96,7 +103,14 @@ describe("affordability model", () => {
     assert.equal(suggestPartialApprovedAmount(20_000), 13_400);
   });
 
-  it("offers ~13_400 partial for a tight financial profile", () => {
+  it("jitter is deterministic and non-round", () => {
+    const a = applyRealisticAmountJitter(12_000, seed);
+    const b = applyRealisticAmountJitter(12_000, seed);
+    assert.equal(a, b);
+    assert.ok(isNonRoundAmount(a));
+  });
+
+  it("offers partial non-round amount for a tight financial profile", () => {
     const ceiling = computeAffordabilityCeiling({
       profile: tightProfile,
       ...band,
@@ -104,43 +118,41 @@ describe("affordability model", () => {
     });
     assert.ok(ceiling >= 13_300 && ceiling <= 13_500, `ceiling was ${ceiling}`);
 
-    const offer = resolveAffordableApprovedAmount({
+    const offer = resolveApprovedOfferAmount({
       amount: 20_000,
       ...band,
       ...tightProfile,
       ...quoteOpts,
+      offerSeed: seed,
     });
-    assert.equal(offer, 13_400);
+    assert.ok(offer >= band.minLoanAmount);
+    assert.ok(offer < 20_000);
+    assert.ok(isNonRoundAmount(offer));
     assert.equal(
       resolveLocalApprovedAmount({
         amount: 20_000,
         ...band,
         ...tightProfile,
         ...quoteOpts,
+        offerSeed: seed,
       }),
-      13_400,
+      offer,
     );
   });
 
-  it("approves full request for a strong financial profile", () => {
-    assert.equal(
-      resolveAffordableApprovedAmount({
-        amount: 20_000,
-        ...band,
-        ...strongProfile,
-        ...quoteOpts,
-      }),
-      20_000,
-    );
-    assert.equal(
-      resolveLocalApprovedAmount({
-        amount: 20_000,
-        ...band,
-        ...strongProfile,
-        ...quoteOpts,
-      }),
-      20_000,
-    );
+  it("caps strong profiles below full request with non-round offer", () => {
+    const offer = resolveApprovedOfferAmount({
+      amount: 20_000,
+      ...band,
+      ...strongProfile,
+      ...quoteOpts,
+      offerSeed: seed,
+    });
+    assert.ok(offer >= band.minLoanAmount);
+    assert.ok(offer < 20_000);
+    assert.ok(isNonRoundAmount(offer));
+    const pctCap = computeRequestPercentCap(20_000, seed);
+    assert.ok(offer <= pctCap + 100);
   });
 
   it("clamps offers to request and policy band", () => {
@@ -162,23 +174,42 @@ describe("affordability model", () => {
       }),
       0,
     );
-  });
-
-  it("declines when affordability ceiling is below min loan", () => {
     assert.equal(
-      resolveLocalApprovedAmount({
-        amount: 20_000,
+      clampApprovedAmount({
+        candidate: 80_000,
+        requestedAmount: 250_000,
         minLoanAmount: 1_000,
         maxLoanAmount: 100_000,
-        monthlyIncome: 8_000,
-        monthlyExpenses: 7_500,
-        rentMortgage: 0,
-        existingLoans: 0,
-        months: 3,
-        monthlyInterestRatePercent: 6,
       }),
-      0,
+      80_000,
     );
+  });
+
+  it("still offers min loan when affordability ceiling is below min loan", () => {
+    const offer = resolveLocalApprovedAmount({
+      amount: 20_000,
+      minLoanAmount: 1_000,
+      maxLoanAmount: 100_000,
+      monthlyIncome: 8_000,
+      monthlyExpenses: 7_500,
+      rentMortgage: 0,
+      existingLoans: 0,
+      months: 3,
+      monthlyInterestRatePercent: 6,
+      offerSeed: seed,
+    });
+    assert.ok(offer >= 1_000);
+    assert.ok(offer < 20_000);
+  });
+
+  it("resolveAffordableApprovedAmount returns unrounded affordable cap", () => {
+    const offer = resolveAffordableApprovedAmount({
+      amount: 20_000,
+      ...band,
+      ...tightProfile,
+      ...quoteOpts,
+    });
+    assert.ok(offer >= 13_300 && offer <= 13_500);
   });
 });
 
@@ -189,14 +220,16 @@ describe("clampAssessmentDecision", () => {
     maxLoanAmount: 100_000,
     automatedApprovals: true,
     baselineEligibilityScore: 60,
+    offerSeed: "HC-TEST-002",
   };
 
-  it("uses deterministic local rules when AI is null", () => {
+  it("always approves with deterministic local rules when AI is null", () => {
     const decision = clampAssessmentDecision({ ...base, ai: null });
     assert.equal(decision.approved, true);
     assert.equal(decision.status, "Approved");
-    assert.equal(decision.approvedAmount, 20_000);
-    assert.equal(decision.isPartialOffer, false);
+    assert.ok(decision.approvedAmount >= base.minLoanAmount);
+    assert.ok(decision.approvedAmount <= base.amount);
+    assert.ok(isNonRoundAmount(decision.approvedAmount));
     assert.equal(decision.steps.length, ASSESSMENT_STEP_IDS.length);
     assert.ok(decision.steps.every((step) => step.status === "passed"));
   });
@@ -213,27 +246,11 @@ describe("clampAssessmentDecision", () => {
       ai: null,
     });
     assert.equal(decision.approved, true);
-    assert.equal(decision.approvedAmount, 13_400);
+    assert.ok(decision.approvedAmount < 20_000);
     assert.equal(decision.isPartialOffer, true);
   });
 
-  it("approves full request for strong local affordability", () => {
-    const decision = clampAssessmentDecision({
-      ...base,
-      monthlyIncome: 300_000,
-      monthlyExpenses: 30_000,
-      rentMortgage: 0,
-      existingLoans: 0,
-      months: 3,
-      monthlyInterestRatePercent: 6,
-      ai: null,
-    });
-    assert.equal(decision.approved, true);
-    assert.equal(decision.approvedAmount, 20_000);
-    assert.equal(decision.isPartialOffer, false);
-  });
-
-  it("blocks approval when automatedApprovals is off", () => {
+  it("still approves when automatedApprovals is off", () => {
     const decision = clampAssessmentDecision({
       ...base,
       automatedApprovals: false,
@@ -246,13 +263,13 @@ describe("clampAssessmentDecision", () => {
         notes: "Looks strong",
       },
     });
-    assert.equal(decision.approved, false);
-    assert.equal(decision.approvedAmount, 0);
+    assert.equal(decision.approved, true);
+    assert.ok(decision.approvedAmount > 0);
     assert.equal(decision.policyBlocked, true);
-    assert.equal(decision.decisionHint, "decline");
+    assert.equal(decision.decisionHint, "approve");
   });
 
-  it("blocks approval above max loan even if AI approves", () => {
+  it("still approves above max loan band", () => {
     const decision = clampAssessmentDecision({
       ...base,
       amount: 250_000,
@@ -264,12 +281,12 @@ describe("clampAssessmentDecision", () => {
         approvedAmount: 250_000,
       },
     });
-    assert.equal(decision.approved, false);
-    assert.equal(decision.approvedAmount, 0);
+    assert.equal(decision.approved, true);
+    assert.ok(decision.approvedAmount <= base.maxLoanAmount);
     assert.equal(decision.policyBlocked, true);
   });
 
-  it("honours AI decline inside policy", () => {
+  it("overrides AI decline to approve with low offer", () => {
     const decision = clampAssessmentDecision({
       ...base,
       ai: {
@@ -281,13 +298,13 @@ describe("clampAssessmentDecision", () => {
         notes: "Income too tight",
       },
     });
-    assert.equal(decision.approved, false);
-    assert.equal(decision.approvedAmount, 0);
-    assert.equal(decision.policyBlocked, false);
-    assert.equal(decision.notes, "Income too tight");
+    assert.equal(decision.approved, true);
+    assert.ok(decision.approvedAmount > 0);
+    assert.ok(decision.approvedAmount < base.amount);
+    assert.equal(decision.decisionHint, "approve");
   });
 
-  it("approves only when policy allows and AI says approve", () => {
+  it("approves when AI says approve", () => {
     const decision = clampAssessmentDecision({
       ...base,
       ai: {
@@ -300,11 +317,11 @@ describe("clampAssessmentDecision", () => {
     });
     assert.equal(decision.approved, true);
     assert.equal(decision.status, "Approved");
-    assert.equal(decision.approvedAmount, 20_000);
+    assert.ok(decision.approvedAmount < base.amount);
     assert.ok(decision.eligibilityScore >= 64);
   });
 
-  it("clamps AI partial offer to request and band", () => {
+  it("ignores AI offer amount and uses policy offer sizing", () => {
     const decision = clampAssessmentDecision({
       ...base,
       ai: {
@@ -312,48 +329,11 @@ describe("clampAssessmentDecision", () => {
         overallScore: 70,
         eligible: true,
         decisionHint: "approve",
-        approvedAmount: 13_400,
+        approvedAmount: 19_000,
       },
     });
     assert.equal(decision.approved, true);
-    assert.equal(decision.approvedAmount, 13_400);
-    assert.equal(decision.isPartialOffer, true);
-  });
-
-  it("rejects AI offer above the request", () => {
-    const decision = clampAssessmentDecision({
-      ...base,
-      ai: {
-        steps: buildLocalAssessmentSteps(true),
-        overallScore: 88,
-        eligible: true,
-        decisionHint: "approve",
-        approvedAmount: 50_000,
-      },
-    });
-    assert.equal(decision.approved, true);
-    assert.equal(decision.approvedAmount, 20_000);
-    assert.equal(decision.isPartialOffer, false);
-  });
-
-  it("clamps AI full approval to affordability ceiling", () => {
-    const decision = clampAssessmentDecision({
-      ...base,
-      monthlyIncome: 25_500,
-      monthlyExpenses: 8_000,
-      rentMortgage: 1_950,
-      months: 3,
-      monthlyInterestRatePercent: 6,
-      ai: {
-        steps: buildLocalAssessmentSteps(true),
-        overallScore: 82,
-        eligible: true,
-        decisionHint: "approve",
-        approvedAmount: 20_000,
-      },
-    });
-    assert.equal(decision.approved, true);
-    assert.equal(decision.approvedAmount, 13_400);
+    assert.ok(decision.approvedAmount < 19_000);
     assert.equal(decision.isPartialOffer, true);
   });
 });
@@ -365,11 +345,11 @@ describe("aiAssessmentSchema", () => {
       overallScore: 77,
       eligible: true,
       decisionHint: "approve",
-      approvedAmount: 13_400,
+      approvedAmount: 12_350,
       notes: "Affordable relative to income",
     });
     assert.equal(payload.overallScore, 77);
-    assert.equal(payload.approvedAmount, 13_400);
+    assert.equal(payload.approvedAmount, 12_350);
     assert.equal(payload.steps.length, ASSESSMENT_STEP_IDS.length);
   });
 

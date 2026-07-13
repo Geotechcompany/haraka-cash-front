@@ -1,3 +1,4 @@
+import { hashSeedString, seedUnit } from "@/lib/deterministic-seed";
 import {
   ASSESSMENT_STEP_IDS,
   ASSESSMENT_STEPS,
@@ -76,6 +77,8 @@ export type PolicyClampInput = {
   months?: number;
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
+  /** Stable key for deterministic offer sizing (e.g. application number). */
+  offerSeed?: string;
   ai: RawAiAssessment | null;
 };
 
@@ -99,7 +102,7 @@ export function suggestPartialApprovedAmount(requestedAmount: number): number {
 
 /**
  * Clamp a candidate offer into [minLoan, min(request, maxLoan)].
- * Returns 0 when the candidate is invalid or would fall below min after clamp.
+ * When the request is outside the policy band, the effective request is clamped to the band.
  */
 export function clampApprovedAmount(input: {
   candidate: number;
@@ -108,14 +111,37 @@ export function clampApprovedAmount(input: {
   maxLoanAmount: number;
 }): number {
   const request = Math.round(input.requestedAmount);
-  if (!(request >= input.minLoanAmount && request <= input.maxLoanAmount)) {
-    return 0;
-  }
+  const effectiveRequest = Math.min(
+    Math.max(request, input.minLoanAmount),
+    input.maxLoanAmount,
+  );
   const raw = Math.round(input.candidate);
   if (!Number.isFinite(raw) || raw <= 0) return 0;
-  const capped = Math.min(raw, request, input.maxLoanAmount);
+  const capped = Math.min(raw, effectiveRequest, input.maxLoanAmount);
   if (capped < input.minLoanAmount) return 0;
   return capped;
+}
+
+/** Modest share of the request (40–70%) with deterministic variation. */
+export function computeRequestPercentCap(request: number, seed: string): number {
+  const pct = 0.4 + seedUnit(seed, 0) * 0.3;
+  return Math.floor(request * pct);
+}
+
+/**
+ * Nudge a rounded principal toward realistic, non-round KES figures (e.g. 1_250, 2_340).
+ * Same seed always yields the same result.
+ */
+export function applyRealisticAmountJitter(rawAmount: number, seed: string): number {
+  const rounded = Math.max(1, Math.round(rawAmount));
+  const base50 = Math.round(rounded / 50) * 50;
+  const h = hashSeedString(`offer:${seed}:${rounded}`);
+  const offset = 10 + (h % 81);
+  const dir = ((h >> 8) & 1) === 0 ? -1 : 1;
+  let result = Math.max(50, base50 + dir * offset);
+  if (result % 100 === 0) result += 20 + (h % 60);
+  if (result % 500 === 0) result += 30 + (h % 40);
+  return result;
 }
 
 /**
@@ -246,7 +272,7 @@ export function canAffordRequestedLoan(input: {
 }
 
 /**
- * Offer from affordability model: min(request, maxAffordablePrincipal), rounded to nearest 100.
+ * Offer from affordability model: min(request, maxAffordablePrincipal).
  * Returns 0 when max affordable falls below minLoan.
  */
 export function resolveAffordableApprovedAmount(input: {
@@ -262,9 +288,10 @@ export function resolveAffordableApprovedAmount(input: {
   minProcessingFee?: number;
 }): number {
   const request = Math.round(input.amount);
-  if (!(request >= input.minLoanAmount && request <= input.maxLoanAmount)) {
-    return 0;
-  }
+  const effectiveRequest = Math.min(
+    Math.max(request, input.minLoanAmount),
+    input.maxLoanAmount,
+  );
 
   const profile: FinancialProfile = {
     monthlyIncome: input.monthlyIncome,
@@ -275,7 +302,7 @@ export function resolveAffordableApprovedAmount(input: {
 
   const income = Math.max(0, profile.monthlyIncome ?? 0);
   if (income <= 0) {
-    return request;
+    return effectiveRequest;
   }
 
   const months = Math.max(1, Math.round(input.months ?? DEFAULT_REPAYMENT_MONTHS));
@@ -290,13 +317,86 @@ export function resolveAffordableApprovedAmount(input: {
 
   if (ceiling < input.minLoanAmount) return 0;
 
-  const offer = roundToNearestHundred(Math.min(request, ceiling));
+  const offer = Math.min(effectiveRequest, ceiling);
   return clampApprovedAmount({
     candidate: offer,
     requestedAmount: request,
     minLoanAmount: input.minLoanAmount,
     maxLoanAmount: input.maxLoanAmount,
   });
+}
+
+/**
+ * Always-approve offer: low cap from affordability + request share, with realistic jitter.
+ */
+export function resolveApprovedOfferAmount(input: {
+  amount: number;
+  minLoanAmount: number;
+  maxLoanAmount: number;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  existingLoans?: number;
+  rentMortgage?: number;
+  months?: number;
+  monthlyInterestRatePercent?: number;
+  minProcessingFee?: number;
+  offerSeed: string;
+}): number {
+  const request = Math.round(input.amount);
+  const effectiveRequest = Math.min(
+    Math.max(request, input.minLoanAmount),
+    input.maxLoanAmount,
+  );
+  const pctCap = computeRequestPercentCap(effectiveRequest, input.offerSeed);
+
+  const profile: FinancialProfile = {
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+  };
+  const income = Math.max(0, profile.monthlyIncome ?? 0);
+  const months = Math.max(1, Math.round(input.months ?? DEFAULT_REPAYMENT_MONTHS));
+
+  let rawCap: number;
+  if (income <= 0) {
+    rawCap = Math.min(effectiveRequest, pctCap);
+  } else {
+    const ceiling = computeAffordabilityCeiling({
+      profile,
+      minLoanAmount: input.minLoanAmount,
+      maxLoanAmount: input.maxLoanAmount,
+      months,
+      monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+      minProcessingFee: input.minProcessingFee,
+    });
+    const affordable =
+      ceiling >= input.minLoanAmount ? Math.min(effectiveRequest, ceiling) : input.minLoanAmount;
+    rawCap = Math.min(effectiveRequest, pctCap, affordable);
+  }
+
+  if (rawCap < input.minLoanAmount) {
+    rawCap = input.minLoanAmount;
+  }
+
+  const jittered = applyRealisticAmountJitter(rawCap, input.offerSeed);
+  let result = clampApprovedAmount({
+    candidate: jittered,
+    requestedAmount: request,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+  });
+
+  if (result <= 0) {
+    result = clampApprovedAmount({
+      candidate: applyRealisticAmountJitter(input.minLoanAmount, input.offerSeed),
+      requestedAmount: request,
+      minLoanAmount: input.minLoanAmount,
+      maxLoanAmount: input.maxLoanAmount,
+    });
+  }
+
+  return result > 0 ? result : input.minLoanAmount;
 }
 
 /** Deterministic local offer when AI is unavailable. */
@@ -311,8 +411,12 @@ export function resolveLocalApprovedAmount(input: {
   months?: number;
   monthlyInterestRatePercent?: number;
   minProcessingFee?: number;
+  offerSeed?: string;
 }): number {
-  return resolveAffordableApprovedAmount(input);
+  return resolveApprovedOfferAmount({
+    ...input,
+    offerSeed: input.offerSeed ?? `local:${input.amount}`,
+  });
 }
 
 /** Apply affordability ceiling to an AI or policy candidate offer. */
@@ -391,136 +495,66 @@ export function normalizeAssessmentSteps(
 }
 
 /**
- * Hard policy always wins: AI cannot approve when automatedApprovals is off
- * or the requested amount is outside the configured loan band.
- * Approved offers may be partial (approvedAmount ≤ request).
+ * Hard policy clamps AI suggestions; assessments always produce an approved offer.
+ * Approved offers are typically partial (approvedAmount ≤ request) with modest limits.
  */
 export function clampAssessmentDecision(input: PolicyClampInput): ClampedAssessmentDecision {
   const withinBand =
     input.amount >= input.minLoanAmount && input.amount <= input.maxLoanAmount;
   const policyAllowsAuto = input.automatedApprovals && withinBand;
   const policyBlocked = !policyAllowsAuto;
+  const offerSeed = input.offerSeed ?? `assess:${input.amount}`;
 
-  if (!input.ai) {
-    if (!policyAllowsAuto) {
-      return {
-        approved: false,
-        status: "Declined",
-        approvedAmount: 0,
-        isPartialOffer: false,
-        eligibilityScore: Math.max(25, input.baselineEligibilityScore - 15),
-        eligible: false,
-        decisionHint: "decline",
-        notes: policyBlocked ? "Outside automated lending policy." : undefined,
-        steps: buildLocalAssessmentSteps(false),
-        policyBlocked,
-      };
-    }
+  const approvedAmount = resolveApprovedOfferAmount({
+    amount: input.amount,
+    minLoanAmount: input.minLoanAmount,
+    maxLoanAmount: input.maxLoanAmount,
+    monthlyIncome: input.monthlyIncome,
+    monthlyExpenses: input.monthlyExpenses,
+    existingLoans: input.existingLoans,
+    rentMortgage: input.rentMortgage,
+    months: input.months,
+    monthlyInterestRatePercent: input.monthlyInterestRatePercent,
+    minProcessingFee: input.minProcessingFee,
+    offerSeed,
+  });
 
-    const approvedAmount = resolveLocalApprovedAmount({
-      amount: input.amount,
-      minLoanAmount: input.minLoanAmount,
-      maxLoanAmount: input.maxLoanAmount,
-      monthlyIncome: input.monthlyIncome,
-      monthlyExpenses: input.monthlyExpenses,
-      existingLoans: input.existingLoans,
-      rentMortgage: input.rentMortgage,
-      months: input.months,
-      monthlyInterestRatePercent: input.monthlyInterestRatePercent,
-      minProcessingFee: input.minProcessingFee,
-    });
-    const approved = approvedAmount > 0;
-    const isPartialOffer = approved && approvedAmount < Math.round(input.amount);
-    const eligibilityScore = approved
-      ? Math.min(95, input.baselineEligibilityScore + (isPartialOffer ? 4 : 8))
-      : Math.max(25, input.baselineEligibilityScore - 15);
+  const isPartialOffer = approvedAmount < Math.round(input.amount);
 
-    return {
-      approved,
-      status: approved ? "Approved" : "Declined",
-      approvedAmount,
-      isPartialOffer,
-      eligibilityScore,
-      eligible: approved,
-      decisionHint: approved ? "approve" : "decline",
-      notes: approved
-        ? isPartialOffer
-          ? "Partial offer based on affordability."
-          : undefined
-        : "Could not offer at least the minimum loan amount.",
-      steps: buildLocalAssessmentSteps(approved),
-      policyBlocked,
-    };
-  }
+  const scoreFromAi = input.ai
+    ? Math.round(
+        Math.min(
+          100,
+          Math.max(0, Number.isFinite(input.ai.overallScore) ? input.ai.overallScore : 50),
+        ),
+      )
+    : input.baselineEligibilityScore;
 
-  const steps = normalizeAssessmentSteps(input.ai.steps);
-  const aiWantsApprove = input.ai.eligible && input.ai.decisionHint === "approve";
-  const approved = policyAllowsAuto && aiWantsApprove;
-
-  let decisionHint: AssessmentDecisionHint = input.ai.decisionHint;
-  if (policyBlocked) {
-    decisionHint = "decline";
-  } else if (!approved && decisionHint === "approve") {
-    decisionHint = "decline";
-  }
-
-  const scoreFromAi = Math.round(
-    Math.min(100, Math.max(0, Number.isFinite(input.ai.overallScore) ? input.ai.overallScore : 50)),
+  const eligibilityScore = Math.min(
+    95,
+    Math.max(scoreFromAi, input.baselineEligibilityScore + (isPartialOffer ? 4 : 8)),
   );
-  const eligibilityScore = approved
-    ? Math.min(95, Math.max(scoreFromAi, input.baselineEligibilityScore + 4))
-    : Math.max(25, Math.min(scoreFromAi, input.baselineEligibilityScore - 8));
 
-  let approvedAmount = 0;
-  if (approved) {
-    const candidate =
-      typeof input.ai.approvedAmount === "number" && Number.isFinite(input.ai.approvedAmount)
-        ? input.ai.approvedAmount
-        : input.amount;
-    approvedAmount = applyAffordabilityCeiling({
-      candidate,
-      amount: input.amount,
-      minLoanAmount: input.minLoanAmount,
-      maxLoanAmount: input.maxLoanAmount,
-      monthlyIncome: input.monthlyIncome,
-      monthlyExpenses: input.monthlyExpenses,
-      existingLoans: input.existingLoans,
-      rentMortgage: input.rentMortgage,
-      months: input.months,
-      monthlyInterestRatePercent: input.monthlyInterestRatePercent,
-      minProcessingFee: input.minProcessingFee,
-    });
-  }
-
-  const stillApproved = approved && approvedAmount > 0;
-  const isPartialOffer = stillApproved && approvedAmount < Math.round(input.amount);
+  const steps = input.ai
+    ? normalizeAssessmentSteps(input.ai.steps).map((step) =>
+        step.status === "failed" ? { ...step, status: "review" as const } : step,
+      )
+    : buildLocalAssessmentSteps(true);
 
   const notes =
-    input.ai.notes?.trim().slice(0, 280) ||
-    (policyBlocked
-      ? "Outside automated lending policy."
-      : approved && !stillApproved
-        ? "Approved amount fell below the minimum loan."
-        : isPartialOffer
-          ? "Partial offer based on affordability."
-          : undefined);
+    input.ai?.notes?.trim().slice(0, 280) ||
+    (isPartialOffer ? "Partial offer based on affordability." : undefined);
 
   return {
-    approved: stillApproved,
-    status: stillApproved ? "Approved" : "Declined",
-    approvedAmount: stillApproved ? approvedAmount : 0,
+    approved: true,
+    status: "Approved",
+    approvedAmount,
     isPartialOffer,
-    eligibilityScore: stillApproved
-      ? eligibilityScore
-      : Math.max(25, Math.min(scoreFromAi, input.baselineEligibilityScore - 8)),
-    eligible: stillApproved,
-    decisionHint: stillApproved ? decisionHint : "decline",
+    eligibilityScore,
+    eligible: true,
+    decisionHint: "approve",
     notes,
-    steps: stillApproved
-      ? steps.map((step) =>
-          step.status === "failed" ? { ...step, status: "review" as const } : step,
-        )
-      : steps,
+    steps,
     policyBlocked,
   };
 }
