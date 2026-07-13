@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, Copy, Gift, Users, MousePointerClick, MapPin } from "lucide-react";
+import { Check, Copy, Gift, Users, MousePointerClick, MapPin, Share2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { kes } from "@/lib/loan";
+import { buildReferralShareMessage } from "@/lib/referral";
 import { getReferralProgram } from "@/server/referrals";
 
 export const Route = createFileRoute("/referrals")({
@@ -21,23 +22,54 @@ function ReferralsPage() {
   const program = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
   const [inviteUrl, setInviteUrl] = useState(program.invitePath);
   const [shortUrl, setShortUrl] = useState(program.shortLinkPath);
 
   useEffect(() => {
     setInviteUrl(`${window.location.origin}${program.invitePath}`);
     setShortUrl(`${window.location.origin}${program.shortLinkPath}`);
+    setCanNativeShare(typeof navigator.share === "function");
   }, [program.invitePath, program.shortLinkPath]);
 
+  const shareInviteUrl = () =>
+    `${window.location.origin}${program.shortLinkPath}`;
+
+  const shareMessage = () =>
+    buildReferralShareMessage({
+      inviteUrl: shareInviteUrl(),
+      code: program.code,
+    });
+
   const copyLink = async () => {
-    const url = `${window.location.origin}${program.invitePath}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareMessage());
       setCopied(true);
-      toast.success("Link copied");
+      toast.success("Invite message copied");
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Could not copy — select the link and copy manually");
+    }
+  };
+
+  const shareInvite = async () => {
+    const message = shareMessage();
+    try {
+      // text only — including `url` duplicates the link on WhatsApp and similar apps
+      await navigator.share({
+        title: "HarakaCash",
+        text: message,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      try {
+        await navigator.clipboard.writeText(message);
+        setCopied(true);
+        toast.success("Invite message copied");
+        window.setTimeout(() => setCopied(false), 2000);
+      } catch {
+        toast.error("Could not share — copy the invite instead");
+      }
     }
   };
 
@@ -80,7 +112,7 @@ function ReferralsPage() {
           <p className="mt-2 text-xs text-white/70">
             Short link: <span className="font-mono text-white/90">{shortUrl}</span>
           </p>
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap items-center gap-2">
             <Button
               type="button"
               size="lg"
@@ -93,10 +125,21 @@ function ReferralsPage() {
                 </>
               ) : (
                 <>
-                  <Copy className="mr-1 h-4 w-4" /> Copy link
+                  <Copy className="mr-1 h-4 w-4" /> Copy invite
                 </>
               )}
             </Button>
+            {canNativeShare && (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                onClick={shareInvite}
+                className="rounded-xl border-white/40 bg-transparent font-semibold text-white hover:bg-white/10 hover:text-white"
+              >
+                <Share2 className="mr-1 h-4 w-4" /> Share
+              </Button>
+            )}
             <p className="flex items-center text-sm text-white/75">
               Code <span className="ml-2 font-mono font-semibold text-white">{program.code}</span>
             </p>

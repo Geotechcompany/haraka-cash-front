@@ -39,6 +39,19 @@ export function referralShortLinkPath(code: string): string {
   return `/r/${encodeURIComponent(code)}`;
 }
 
+/** Ready-to-paste invite text for WhatsApp, X, Facebook, SMS, etc. */
+export function buildReferralShareMessage(params: {
+  inviteUrl: string;
+  code: string;
+}): string {
+  return [
+    "Need a salary advance, a personal loan, or working capital for your business? HarakaCash is built for Kenya — you apply online with just your national ID, and funds hit M-Pesa with instant disbursement.",
+    "",
+    `Apply with my invite: ${params.inviteUrl}`,
+    `Code: ${params.code}`,
+  ].join("\n");
+}
+
 export function persistReferralCode(raw: string): string | null {
   if (typeof window === "undefined") return null;
   const code = normalizeReferralCode(raw);
