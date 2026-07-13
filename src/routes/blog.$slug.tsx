@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { format } from "date-fns";
+import { BlogCoverImage } from "@/components/blog/blog-cover-image";
 import { BlogPageShell } from "@/components/blog/blog-page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import {
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/blog/$slug")({
       description: post.description,
       path: `/blog/${post.slug}`,
       ogType: "article",
+      ogImage: post.coverImage,
     });
   },
   component: BlogPostPage,
@@ -56,9 +58,14 @@ function BlogPostPage() {
             slug: post.slug,
             publishedAt: post.publishedAt,
             author: post.author,
+            coverImage: post.coverImage,
           }),
         ])}
       />
+
+      {post.coverImage ? (
+        <BlogCoverImage src={post.coverImage} alt={post.title} variant="hero" />
+      ) : null}
 
       <div
         className="prose-blog mt-10"

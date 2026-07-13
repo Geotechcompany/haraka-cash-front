@@ -5,6 +5,7 @@ export interface BlogPostFrontmatter {
   publishedAt: string;
   author: string;
   tags: string[];
+  coverImage?: string;
 }
 
 export interface BlogPostSummary extends BlogPostFrontmatter {

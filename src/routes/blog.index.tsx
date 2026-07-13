@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
+import { BlogCoverImage } from "@/components/blog/blog-cover-image";
 import { BlogPageShell } from "@/components/blog/blog-page-shell";
 import { JsonLd } from "@/components/seo/json-ld";
 import {
@@ -45,34 +46,41 @@ function BlogIndexPage() {
         {posts.map((post) => (
           <li key={post.slug}>
             <article className="card-soft p-5 transition-shadow hover:shadow-elevated sm:p-6">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <time dateTime={post.publishedAt}>
-                  {format(new Date(post.publishedAt), "d MMM yyyy")}
-                </time>
-                <span aria-hidden>·</span>
-                <span>{post.readingMinutes} min read</span>
-              </div>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight">
-                <Link
-                  to="/blog/$slug"
-                  params={{ slug: post.slug }}
-                  className="hover:text-primary"
-                >
-                  {post.title}
-                </Link>
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {post.description}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {post.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-                  >
-                    {tag}
-                  </span>
-                ))}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch">
+                {post.coverImage ? (
+                  <BlogCoverImage src={post.coverImage} alt={post.title} variant="card" />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <time dateTime={post.publishedAt}>
+                      {format(new Date(post.publishedAt), "d MMM yyyy")}
+                    </time>
+                    <span aria-hidden>·</span>
+                    <span>{post.readingMinutes} min read</span>
+                  </div>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">
+                    <Link
+                      to="/blog/$slug"
+                      params={{ slug: post.slug }}
+                      className="hover:text-primary"
+                    >
+                      {post.title}
+                    </Link>
+                  </h2>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    {post.description}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {post.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </article>
           </li>

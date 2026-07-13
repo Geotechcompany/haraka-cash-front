@@ -16,12 +16,17 @@ function parseFrontmatter(data: Record<string, unknown>): BlogPostFrontmatter {
   const publishedAt = String(data.publishedAt ?? "");
   const author = String(data.author ?? "HarakaCash Team");
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+  const coverImageRaw = data.coverImage;
+  const coverImage =
+    typeof coverImageRaw === "string" && coverImageRaw.trim()
+      ? coverImageRaw.trim()
+      : undefined;
 
   if (!title || !description || !slug || !publishedAt) {
     throw new Error("Blog post frontmatter requires title, description, slug, and publishedAt.");
   }
 
-  return { title, description, slug, publishedAt, author, tags };
+  return { title, description, slug, publishedAt, author, tags, coverImage };
 }
 
 function parseFile(raw: string): BlogPost {
