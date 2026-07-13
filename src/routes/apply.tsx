@@ -454,7 +454,16 @@ function ApplyPage() {
 
   const submit = async () => {
     setAttempted(true);
-    if (!stepValid) return;
+    const allErrors = validateAllSteps(form);
+    if (Object.keys(allErrors).length > 0) {
+      const firstInvalidStep = [0, 1, 2, 3, 4].find(
+        (s) => Object.keys(validateStep(s, form)).length > 0,
+      );
+      if (firstInvalidStep != null && firstInvalidStep !== step) {
+        setStep(firstInvalidStep);
+      }
+      return;
+    }
     setSubmitting(true);
     try {
       const application = await createApplicationFn({
@@ -463,6 +472,7 @@ function ApplyPage() {
           months,
           productType,
           purpose: form.purpose,
+          nationalId: form.nationalId.trim(),
           phone: form.phone.trim(),
           mpesaNumber: form.mpesaNumber.trim(),
           employer: form.employer.trim(),
@@ -976,7 +986,6 @@ function ApplyPage() {
             <div className="mt-5 space-y-3 text-sm">
               <Row label="Principal" value={kes(quote.amount)} />
               <Row label={`Interest (${quote.months}mo)`} value={kes(quote.interest)} />
-              <Row label="Processing fee" value={kes(quote.fee)} />
               <div className="h-px bg-border my-1" />
               <Row label="Monthly payment" value={kes(quote.monthly)} bold />
               <Row label="Total payable" value={kes(quote.totalPayable)} bold />
@@ -1009,6 +1018,13 @@ function requiredNonNegative(value: string, label: string) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return `Enter a valid ${label.toLowerCase()}`;
   return null;
+}
+
+function validateAllSteps(form: FormState): FieldErrors {
+  return [0, 1, 2, 3, 4].reduce<FieldErrors>(
+    (acc, s) => ({ ...acc, ...validateStep(s, form) }),
+    {},
+  );
 }
 
 function validateStep(step: number, form: FormState): FieldErrors {

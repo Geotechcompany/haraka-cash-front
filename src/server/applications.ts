@@ -16,7 +16,7 @@ import { normalizeDraftPayload } from "@/lib/application-draft";
 import { clampRepaymentMonths, MAX_REPAYMENT_MONTHS } from "@/lib/lending-products";
 import { toUserProfile, type UserRecord } from "@/lib/models/user";
 import { buildLoanQuote } from "@/lib/loan";
-import { isValidKenyanPhone } from "@/lib/kenya-format";
+import { isValidKenyanNationalId, isValidKenyanPhone } from "@/lib/kenya-format";
 import { applicationStatusForReview, statusRequiresConfirmedProcessingFee } from "@/lib/admin-domain";
 import { requireAdmin, requireUserId } from "@/server/auth";
 
@@ -223,11 +223,20 @@ const kenyanMobile = z
     message: "Enter a valid Kenyan mobile number",
   });
 
+const kenyanNationalId = z
+  .string()
+  .trim()
+  .min(1, "National ID is required")
+  .refine((value) => isValidKenyanNationalId(value), {
+    message: "Enter a valid National ID (7–8 digits)",
+  });
+
 const createApplicationInput = z.object({
   amount: z.number().positive(),
   months: z.number().int().min(1).max(MAX_REPAYMENT_MONTHS),
   productType: productTypeSchema.default("personal_loan"),
   purpose: z.string().min(1).default("Personal"),
+  nationalId: kenyanNationalId,
   phone: kenyanMobile,
   mpesaNumber: kenyanMobile,
   county: z.string().optional(),
@@ -290,6 +299,7 @@ export const createApplication = createServerFn({ method: "POST" })
       applicationNumber,
       clerkUserId,
       applicant,
+      nationalId: data.nationalId,
       phone: contactPhone,
       mpesaNumber,
       county: data.county ?? user.county ?? "Nairobi",

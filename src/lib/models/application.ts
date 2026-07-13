@@ -21,6 +21,8 @@ export type ApplicationRecord = {
   applicationNumber: string;
   clerkUserId?: string;
   applicant: string;
+  /** Kenyan national ID from the apply form (7–8 digits). */
+  nationalId?: string;
   /** Contact phone from the apply form. */
   phone: string;
   /** M-Pesa MSISDN for STK / disbursement (apply-form “M-Pesa number”). */
