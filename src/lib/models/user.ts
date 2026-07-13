@@ -7,7 +7,16 @@ export type UserRecord = {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  nationalId?: string;
+  dateOfBirth?: string;
   county?: string;
+  employer?: string;
+  jobTitle?: string;
+  monthlyIncome?: number;
+  yearsEmployed?: number;
+  bankName?: string;
+  accountNumber?: string;
+  mpesaNumber?: string;
   eligibilityScore: number;
   availableCredit: number;
   /** Unique invite code this user shares (`?ref=`). */
@@ -30,6 +39,16 @@ export type UserProfile = {
   name: string;
   email?: string;
   phone?: string;
+  nationalId?: string;
+  dateOfBirth?: string;
+  county?: string;
+  employer?: string;
+  jobTitle?: string;
+  monthlyIncome?: number;
+  yearsEmployed?: number;
+  bankName?: string;
+  accountNumber?: string;
+  mpesaNumber?: string;
   eligibilityScore: number;
   availableCredit: number;
   profileComplete: number;
@@ -51,12 +70,107 @@ export type AdminUser = {
   updatedAt: string;
 };
 
+/** Fields that contribute to profile completeness (equal weight). */
+export const PROFILE_COMPLETENESS_FIELDS = [
+  "name",
+  "nationalId",
+  "phone",
+  "email",
+  "dateOfBirth",
+  "county",
+  "employer",
+  "jobTitle",
+  "monthlyIncome",
+  "yearsEmployed",
+  "bankName",
+  "accountNumber",
+  "mpesaNumber",
+] as const;
+
+export type ProfileCompletenessSource = {
+  firstName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
+  nationalId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  dateOfBirth?: string | null;
+  county?: string | null;
+  employer?: string | null;
+  jobTitle?: string | null;
+  monthlyIncome?: number | null;
+  yearsEmployed?: number | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  mpesaNumber?: string | null;
+};
+
+function hasText(value: string | null | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
+function hasPositiveNumber(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function hasNonNegativeNumber(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+export function displayNameFromParts(
+  firstName?: string | null,
+  lastName?: string | null,
+): string {
+  return [firstName, lastName].filter(Boolean).join(" ").trim() || "HarakaCash user";
+}
+
+export function splitFullName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0]!, lastName: "" };
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(" ") };
+}
+
+export function computeProfileComplete(source: ProfileCompletenessSource): number {
+  const name =
+    source.name?.trim() ||
+    [source.firstName, source.lastName].filter(Boolean).join(" ").trim();
+
+  const filled = [
+    hasText(name),
+    hasText(source.nationalId),
+    hasText(source.phone),
+    hasText(source.email),
+    hasText(source.dateOfBirth),
+    hasText(source.county),
+    hasText(source.employer),
+    hasText(source.jobTitle),
+    hasPositiveNumber(source.monthlyIncome),
+    hasNonNegativeNumber(source.yearsEmployed),
+    hasText(source.bankName),
+    hasText(source.accountNumber),
+    hasText(source.mpesaNumber),
+  ].filter(Boolean).length;
+
+  return Math.round((filled / PROFILE_COMPLETENESS_FIELDS.length) * 100);
+}
+
 export function toUserProfile(doc: UserRecord): UserProfile {
-  const name = [doc.firstName, doc.lastName].filter(Boolean).join(" ") || "HarakaCash user";
+  const name = displayNameFromParts(doc.firstName, doc.lastName);
   return {
     name,
     email: doc.email,
     phone: doc.phone,
+    nationalId: doc.nationalId,
+    dateOfBirth: doc.dateOfBirth,
+    county: doc.county,
+    employer: doc.employer,
+    jobTitle: doc.jobTitle,
+    monthlyIncome: doc.monthlyIncome,
+    yearsEmployed: doc.yearsEmployed,
+    bankName: doc.bankName,
+    accountNumber: doc.accountNumber,
+    mpesaNumber: doc.mpesaNumber,
     eligibilityScore: doc.eligibilityScore,
     availableCredit: doc.availableCredit,
     profileComplete: doc.profileComplete,
@@ -72,7 +186,7 @@ export function toAdminUser(
   doc: UserRecord,
   loanSummary?: Partial<AdminUserLoanSummary>,
 ): AdminUser {
-  const name = [doc.firstName, doc.lastName].filter(Boolean).join(" ") || "HarakaCash user";
+  const name = displayNameFromParts(doc.firstName, doc.lastName);
 
   return {
     id: doc.clerkId,

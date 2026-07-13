@@ -14,7 +14,12 @@ import {
 } from "@/lib/models/application-draft";
 import { normalizeDraftPayload } from "@/lib/application-draft";
 import { clampRepaymentMonths, MAX_REPAYMENT_MONTHS } from "@/lib/lending-products";
-import { toUserProfile, type UserRecord } from "@/lib/models/user";
+import {
+  computeProfileComplete,
+  splitFullName,
+  toUserProfile,
+  type UserRecord,
+} from "@/lib/models/user";
 import { buildLoanQuote } from "@/lib/loan";
 import { isValidKenyanNationalId, isValidKenyanPhone } from "@/lib/kenya-format";
 import { applicationStatusForReview, statusRequiresConfirmedProcessingFee } from "@/lib/admin-domain";
@@ -58,8 +63,132 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(async ()
   const { userId, isAuthenticated } = await auth();
   if (!isAuthenticated || !userId) return null;
   const user = await ensureUser(userId);
+  const profileComplete = computeProfileComplete(user);
+  if (profileComplete !== user.profileComplete) {
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    await db
+      .collection<UserRecord>("users")
+      .updateOne(
+        { clerkId: userId },
+        { $set: { profileComplete, updatedAt: new Date() } },
+      );
+    return toUserProfile({ ...user, profileComplete });
+  }
   return toUserProfile(user);
 });
+
+const optionalKenyanPhone = z
+  .string()
+  .trim()
+  .max(20)
+  .refine((value) => value === "" || isValidKenyanPhone(value), {
+    message: "Enter a valid Kenyan mobile (e.g. 0712 345 678)",
+  });
+
+const optionalKenyanNationalId = z
+  .string()
+  .trim()
+  .max(20)
+  .refine((value) => value === "" || isValidKenyanNationalId(value), {
+    message: "Enter a valid National ID (7–8 digits)",
+  });
+
+const updateProfileInput = z.object({
+  fullName: z.string().trim().min(1, "Full name is required").max(120),
+  nationalId: optionalKenyanNationalId,
+  phone: optionalKenyanPhone,
+  email: z
+    .string()
+    .trim()
+    .max(160)
+    .refine((value) => value === "" || z.string().email().safeParse(value).success, {
+      message: "Enter a valid email address",
+    }),
+  dateOfBirth: z
+    .string()
+    .trim()
+    .max(10)
+    .refine((value) => value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value), {
+      message: "Enter a valid date of birth",
+    }),
+  county: z.string().trim().max(80),
+  employer: z.string().trim().max(120),
+  jobTitle: z.string().trim().max(80),
+  monthlyIncome: z.number().nonnegative().nullable(),
+  yearsEmployed: z.number().nonnegative().max(60).nullable(),
+  bankName: z.string().trim().max(80),
+  accountNumber: z.string().trim().max(40),
+  mpesaNumber: optionalKenyanPhone,
+});
+
+export const updateCurrentUserProfile = createServerFn({ method: "POST" })
+  .validator((input: unknown) => updateProfileInput.parse(input))
+  .handler(async ({ data }) => {
+    const clerkUserId = await requireUserId();
+    await ensureUser(clerkUserId);
+
+    const { firstName, lastName } = splitFullName(data.fullName);
+    const monthlyIncome = data.monthlyIncome;
+    const yearsEmployed = data.yearsEmployed;
+
+    const profileComplete = computeProfileComplete({
+      firstName,
+      lastName,
+      nationalId: data.nationalId,
+      phone: data.phone,
+      email: data.email,
+      dateOfBirth: data.dateOfBirth,
+      county: data.county,
+      employer: data.employer,
+      jobTitle: data.jobTitle,
+      monthlyIncome: monthlyIncome ?? undefined,
+      yearsEmployed: yearsEmployed ?? undefined,
+      bankName: data.bankName,
+      accountNumber: data.accountNumber,
+      mpesaNumber: data.mpesaNumber,
+    });
+
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const now = new Date();
+
+    const $set: Record<string, unknown> = {
+      firstName,
+      lastName,
+      nationalId: data.nationalId,
+      phone: data.phone,
+      email: data.email,
+      dateOfBirth: data.dateOfBirth,
+      county: data.county,
+      employer: data.employer,
+      jobTitle: data.jobTitle,
+      bankName: data.bankName,
+      accountNumber: data.accountNumber,
+      mpesaNumber: data.mpesaNumber,
+      profileComplete,
+      updatedAt: now,
+    };
+    const $unset: Record<string, ""> = {};
+
+    if (monthlyIncome === null) $unset.monthlyIncome = "";
+    else $set.monthlyIncome = monthlyIncome;
+
+    if (yearsEmployed === null) $unset.yearsEmployed = "";
+    else $set.yearsEmployed = yearsEmployed;
+
+    const result = await db.collection<UserRecord>("users").findOneAndUpdate(
+      { clerkId: clerkUserId },
+      {
+        $set,
+        ...(Object.keys($unset).length > 0 ? { $unset } : {}),
+      },
+      { returnDocument: "after" },
+    );
+
+    if (!result) throw new Error("Could not save profile");
+    return toUserProfile(result);
+  });
 
 const draftFormSchema = z.object({
   fullName: z.string().max(120).default(""),
