@@ -1,2 +1,19 @@
 User-agent: *
 Allow: /
+
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /apply
+Disallow: /decision
+Disallow: /assessment
+Disallow: /loans
+Disallow: /profile
+Disallow: /settings
+Disallow: /notifications
+Disallow: /referrals
+Disallow: /login
+Disallow: /otp
+Disallow: /forgot
+
+Sitemap: https://harakacash.netlify.app/sitemap.xml

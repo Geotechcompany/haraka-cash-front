@@ -25,12 +25,14 @@ import { Route as ForgotRouteImport } from './routes/forgot'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DecisionRouteImport } from './routes/decision'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BlogRouteImport } from './routes/blog'
 import { Route as AssessmentRouteImport } from './routes/assessment'
 import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as RCodeRouteImport } from './routes/r.$code'
+import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
@@ -124,6 +126,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogRoute = BlogRouteImport.update({
+  id: '/blog',
+  path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssessmentRoute = AssessmentRouteImport.update({
   id: '/assessment',
   path: '/assessment',
@@ -153,6 +160,11 @@ const RCodeRoute = RCodeRouteImport.update({
   id: '/r/$code',
   path: '/r/$code',
   getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => BlogRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
@@ -221,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/apply': typeof ApplyRoute
   '/assessment': typeof AssessmentRoute
+  '/blog': typeof BlogRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/decision': typeof DecisionRoute
   '/faq': typeof FaqRoute
@@ -247,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
@@ -256,6 +270,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apply': typeof ApplyRoute
   '/assessment': typeof AssessmentRoute
+  '/blog': typeof BlogRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/decision': typeof DecisionRoute
   '/faq': typeof FaqRoute
@@ -282,6 +297,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
@@ -293,6 +309,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/apply': typeof ApplyRoute
   '/assessment': typeof AssessmentRoute
+  '/blog': typeof BlogRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/decision': typeof DecisionRoute
   '/faq': typeof FaqRoute
@@ -319,6 +336,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/users': typeof AdminUsersRoute
+  '/blog/$slug': typeof BlogSlugRoute
   '/r/$code': typeof RCodeRoute
   '/admin/': typeof AdminIndexRoute
   '/api/webhooks/smply-pay': typeof ApiWebhooksSmplyPayRoute
@@ -331,6 +349,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/apply'
     | '/assessment'
+    | '/blog'
     | '/dashboard'
     | '/decision'
     | '/faq'
@@ -357,6 +376,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/blog/$slug'
     | '/r/$code'
     | '/admin/'
     | '/api/webhooks/smply-pay'
@@ -366,6 +386,7 @@ export interface FileRouteTypes {
     | '/'
     | '/apply'
     | '/assessment'
+    | '/blog'
     | '/dashboard'
     | '/decision'
     | '/faq'
@@ -392,6 +413,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/blog/$slug'
     | '/r/$code'
     | '/admin'
     | '/api/webhooks/smply-pay'
@@ -402,6 +424,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/apply'
     | '/assessment'
+    | '/blog'
     | '/dashboard'
     | '/decision'
     | '/faq'
@@ -428,6 +451,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/support'
     | '/admin/users'
+    | '/blog/$slug'
     | '/r/$code'
     | '/admin/'
     | '/api/webhooks/smply-pay'
@@ -439,6 +463,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   ApplyRoute: typeof ApplyRoute
   AssessmentRoute: typeof AssessmentRoute
+  BlogRoute: typeof BlogRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   DecisionRoute: typeof DecisionRoute
   FaqRoute: typeof FaqRoute
@@ -574,6 +599,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog': {
+      id: '/blog'
+      path: '/blog'
+      fullPath: '/blog'
+      preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assessment': {
       id: '/assessment'
       path: '/assessment'
@@ -615,6 +647,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/r/$code'
       preLoaderRoute: typeof RCodeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
+      parentRoute: typeof BlogRoute
     }
     '/admin/users': {
       id: '/admin/users'
@@ -733,11 +772,22 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface BlogRouteChildren {
+  BlogSlugRoute: typeof BlogSlugRoute
+}
+
+const BlogRouteChildren: BlogRouteChildren = {
+  BlogSlugRoute: BlogSlugRoute,
+}
+
+const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   ApplyRoute: ApplyRoute,
   AssessmentRoute: AssessmentRoute,
+  BlogRoute: BlogRouteWithChildren,
   DashboardRoute: DashboardRoute,
   DecisionRoute: DecisionRoute,
   FaqRoute: FaqRoute,

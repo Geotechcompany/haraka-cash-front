@@ -7,24 +7,28 @@ import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { kes } from "@/lib/loan";
+import { JsonLd } from "@/components/seo/json-ld";
+import {
+  buildFaqSchema,
+  buildFinancialServiceSchema,
+  buildJsonLdGraph,
+  buildOrganizationSchema,
+  buildPageMeta,
+  buildWebSiteSchema,
+} from "@/lib/seo";
+
+const LANDING_TITLE = "HarakaCash — M-Pesa Loans & Salary Advance Kenya";
+const LANDING_DESCRIPTION =
+  "Get M-Pesa loans and salary advances in minutes. HarakaCash shows every fee on your offer before you accept. Fast decisions, payout after CRB clearance. Apply today.";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "HarakaCash — M-Pesa Loans & Salary Advance Kenya" },
-      {
-        name: "description",
-        content:
-          "Personal loans and salary advances to M-Pesa. Clear fees, one-month terms, instant decisions. Built for Kenya.",
-      },
-      { property: "og:title", content: "HarakaCash — M-Pesa Loans & Salary Advance Kenya" },
-      {
-        property: "og:description",
-        content: "Borrow to M-Pesa or advance against your next salary. Clear fees. Fast decisions.",
-      },
-      { property: "og:image", content: "/logo.png" },
-    ],
-  }),
+  head: () =>
+    buildPageMeta({
+      title: LANDING_TITLE,
+      description: LANDING_DESCRIPTION,
+      path: "/",
+      ogImage: "/hero.jpg",
+    }),
   component: Landing,
 });
 
@@ -87,6 +91,9 @@ function Landing() {
             <a href="#faq" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
               FAQ
             </a>
+            <Link to="/blog" className="rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground">
+              Blog
+            </Link>
           </nav>
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
@@ -122,7 +129,18 @@ function Landing() {
       </header>
 
       {/* One composition: brand + headline + line + CTAs + full-bleed photo plane */}
-      <section className="relative min-h-[min(92dvh,920px)] overflow-hidden landing-hero-photo text-white">
+      <section
+        className="relative min-h-[min(92dvh,920px)] overflow-hidden landing-hero-photo text-white"
+        aria-label="Borrower receiving an M-Pesa loan payout on mobile in Kenya"
+      >
+        <img
+          src="/hero.jpg"
+          alt="Kenyan borrower checking an M-Pesa loan offer on a smartphone"
+          width={1200}
+          height={630}
+          className="sr-only"
+          fetchPriority="high"
+        />
         <div className="relative mx-auto grid min-h-[min(92dvh,920px)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-0 lg:px-8 lg:py-24">
           <motion.div
             className="relative z-10 max-w-xl"
@@ -461,6 +479,7 @@ function Landing() {
               {
                 heading: "Help",
                 links: [
+                  ["Blog", "/blog"],
                   ["FAQ", "#faq"],
                   ["Support", "/support"],
                   isSignedIn ? ["Invite", "/referrals"] : ["Sign in", "/login"],
@@ -490,19 +509,13 @@ function Landing() {
           </div>
         </div>
       </footer>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: faqs.map((item) => ({
-              "@type": "Question",
-              name: item.q,
-              acceptedAnswer: { "@type": "Answer", text: item.a },
-            })),
-          }),
-        }}
+      <JsonLd
+        data={buildJsonLdGraph([
+          buildOrganizationSchema(),
+          buildFinancialServiceSchema(),
+          buildWebSiteSchema(),
+          buildFaqSchema(faqs),
+        ])}
       />
     </div>
   );
