@@ -204,6 +204,7 @@ async function probeWithdrawEndpoints(
     phone,
     amount,
     reference: `PROBE-WD-${Date.now()}`,
+    remarks: "spec test",
   });
   const found = await probeEndpoint("Withdrawal endpoint", paths, baseUrl, apiKey, body, clientId);
   if (!found) {
@@ -300,7 +301,12 @@ async function main() {
   const phone = args.phone ?? "0700000000";
   const reference = `DEBUG-${Date.now()}`;
   const requestBody = args.withdraw
-    ? buildWithdrawBody({ phone, amount: args.amount, reference })
+    ? buildWithdrawBody({
+        phone,
+        amount: args.amount,
+        reference,
+        remarks: "spec test",
+      })
     : buildStkPushBody({ phone, amount: args.amount, reference });
 
   console.log(

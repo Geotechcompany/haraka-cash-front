@@ -9,28 +9,39 @@ test("toSmplyPhoneNumber normalizes 254 and bare 9-digit to local 07…", () => 
   assert.equal(toSmplyPhoneNumber("757344328"), "0757344328");
 });
 
-test("buildWithdrawBody matches STK Postman shape including projectCode", () => {
+test("buildWithdrawBody matches Postman B2C shape including remarks", () => {
   process.env.SMPLY_PAY_PROJECT_CODE = "WLT-CD-1MRWANZ";
 
-  const stk = buildStkPushBody({
-    phone: "254757344328",
-    amount: 5,
-    reference: "WD-TEST-1",
-  });
   const withdraw = buildWithdrawBody({
-    phone: "254757344328",
+    phone: "254719671440",
     amount: 5,
     reference: "WD-TEST-1",
+    remarks: "spec test",
   });
 
   assert.deepEqual(withdraw, {
-    phoneNumber: "0757344328",
+    phoneNumber: "0719671440",
     amount: "5",
     projectCode: "WLT-CD-1MRWANZ",
     orderCode: "",
     transactionId: "WD-TEST-1",
+    remarks: "spec test",
   });
-  assert.deepEqual(withdraw, stk);
+});
+
+test("buildWithdrawBody defaults remarks when omitted", () => {
+  process.env.SMPLY_PAY_PROJECT_CODE = "WLT-CD-1MRWANZ";
+  const withdraw = buildWithdrawBody({
+    phone: "0757344328",
+    amount: 1,
+    reference: "WD-DEFAULT",
+  });
+  assert.equal(withdraw.remarks, "withdrawal");
+  assert.notDeepEqual(withdraw, buildStkPushBody({
+    phone: "0757344328",
+    amount: 1,
+    reference: "WD-DEFAULT",
+  }));
 });
 
 test("buildWithdrawBody rejects missing project code", () => {

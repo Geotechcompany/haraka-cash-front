@@ -226,11 +226,12 @@ export function buildStkPushBody(input: {
   };
 }
 
-/** Same Postman-shaped body as STK; B2C also requires projectCode. */
+/** Postman B2C body: phoneNumber, amount, projectCode, orderCode, transactionId, remarks. */
 export function buildWithdrawBody(input: {
   phone: string;
   amount: number;
   reference: string;
+  remarks?: string;
   orderCode?: string;
   projectCode?: string;
 }) {
@@ -240,6 +241,7 @@ export function buildWithdrawBody(input: {
     projectCode: input.projectCode ?? getProjectCode(),
     orderCode: input.orderCode ?? "",
     transactionId: input.reference,
+    remarks: input.remarks?.trim() || "withdrawal",
   };
 }
 
@@ -329,6 +331,7 @@ export async function initiateSmplyWithdrawal(input: {
       phone: input.phone,
       amount: input.amount,
       reference: input.reference,
+      remarks: input.description,
     }),
   });
 
