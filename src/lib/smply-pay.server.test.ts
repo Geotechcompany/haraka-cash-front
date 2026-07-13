@@ -4,10 +4,13 @@ import test from "node:test";
 import {
   buildStkPushBody,
   buildWithdrawBody,
+  fromStkTransactionId,
   getWalletBalancePath,
   interpretSmplyStkResponse,
   interpretSmplyWithdrawResponse,
+  parseSmplyWebhook,
   toSmplyPhoneNumber,
+  toStkTransactionId,
 } from "@/lib/smply-pay.server";
 
 test("toSmplyPhoneNumber normalizes 254 and bare 9-digit to local 07…", () => {
@@ -95,7 +98,22 @@ test("getWalletBalancePath uses Postman wallet code segment", () => {
   );
 });
 
-test("buildStkPushBody uses DEP reference for admin deposits", () => {
+test("toStkTransactionId brands internal payment references", () => {
+  assert.equal(toStkTransactionId("DEP-TEST-1"), "HARAKA-CASH-KENYA-DEP-TEST-1");
+  assert.equal(toStkTransactionId("FEE-ABC"), "HARAKA-CASH-KENYA-FEE-ABC");
+  assert.equal(
+    toStkTransactionId("HARAKA-CASH-KENYA-DEP-ALREADY"),
+    "HARAKA-CASH-KENYA-DEP-ALREADY",
+  );
+});
+
+test("fromStkTransactionId recovers internal refs from branded or bare ids", () => {
+  assert.equal(fromStkTransactionId("HARAKA-CASH-KENYA-DEP-TEST-1"), "DEP-TEST-1");
+  assert.equal(fromStkTransactionId("HARAKA CASH KENYA FEE-1"), "FEE-1");
+  assert.equal(fromStkTransactionId("DEP-BARE"), "DEP-BARE");
+});
+
+test("buildStkPushBody uses branded Haraka Cash Kenya transactionId", () => {
   process.env.SMPLY_PAY_PROJECT_CODE = "WLT-CD-1MRWANZ";
   assert.deepEqual(
     buildStkPushBody({
@@ -108,9 +126,19 @@ test("buildStkPushBody uses DEP reference for admin deposits", () => {
       amount: "1",
       projectCode: "WLT-CD-1MRWANZ",
       orderCode: "",
-      transactionId: "DEP-TEST-1",
+      transactionId: "HARAKA-CASH-KENYA-DEP-TEST-1",
     },
   );
+});
+
+test("parseSmplyWebhook maps branded STK transactionId to internal reference", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-FEE-99-XYZ",
+    status: "success",
+    ResultCode: "0",
+  });
+  assert.equal(parsed.reference, "FEE-99-XYZ");
+  assert.equal(parsed.status, "success");
 });
 
 test("interpretSmplyStkResponse treats bare Success as pending prompt, not paid", () => {

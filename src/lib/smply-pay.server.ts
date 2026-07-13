@@ -230,6 +230,38 @@ function extractProviderErrorMessage(payload: unknown): string | undefined {
   return undefined;
 }
 
+/** Brand prefix for STK `transactionId` (hyphenated — spaces return HTTP 400 from SMPLY). */
+export const STK_TRANSACTION_BRAND = "HARAKA-CASH-KENYA";
+
+/** SMPLY STK `transactionId`: branded unique string embedding the internal payment reference. */
+export function toStkTransactionId(reference: string): string {
+  const trimmed = reference.trim();
+  if (!trimmed) {
+    throw new Error("STK transactionId requires a non-empty payment reference");
+  }
+  if (
+    trimmed.startsWith(`${STK_TRANSACTION_BRAND}-`) ||
+    trimmed.startsWith("HARAKA CASH KENYA ")
+  ) {
+    return trimmed;
+  }
+  return `${STK_TRANSACTION_BRAND}-${trimmed}`;
+}
+
+/** Recover internal payment reference from a branded STK transactionId (or passthrough). */
+export function fromStkTransactionId(transactionId: string): string {
+  const trimmed = transactionId.trim();
+  const hyphenPrefix = `${STK_TRANSACTION_BRAND}-`;
+  if (trimmed.startsWith(hyphenPrefix)) {
+    return trimmed.slice(hyphenPrefix.length).trim();
+  }
+  const spacedPrefix = "HARAKA CASH KENYA ";
+  if (trimmed.startsWith(spacedPrefix)) {
+    return trimmed.slice(spacedPrefix.length).trim();
+  }
+  return trimmed;
+}
+
 export function buildStkPushBody(input: {
   phone: string;
   amount: number;
@@ -243,7 +275,7 @@ export function buildStkPushBody(input: {
     amount: String(Math.round(input.amount)),
     projectCode: input.projectCode ?? getProjectCode(),
     orderCode: input.orderCode ?? "",
-    transactionId: input.reference,
+    transactionId: toStkTransactionId(input.reference),
   };
 }
 
@@ -506,13 +538,14 @@ export function parseSmplyWebhook(payload: unknown) {
   }
 
   const data = payload as Record<string, unknown>;
-  const reference = pickString(data, [
+  const rawReference = pickString(data, [
     "reference",
     "transactionId",
     "transaction_id",
     "account_reference",
     "AccountReference",
   ]);
+  const reference = rawReference ? fromStkTransactionId(rawReference) : undefined;
   const providerRef = pickString(data, [
     "transaction_id",
     "transactionId",
