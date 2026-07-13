@@ -15,11 +15,14 @@ import {
   initiateAdminDeposit,
   initiateAdminWithdrawal,
   listPaymentTransactions,
+  reconcilePendingWalletPayments,
 } from "@/server/payments";
 
 export const Route = createFileRoute("/admin/payments")({
   head: () => ({ meta: [{ title: "Payments — Admin" }] }),
   loader: async () => {
+    // SMPLY often never POSTs webhooks locally — align pending rows with wallet when possible.
+    await reconcilePendingWalletPayments().catch(() => null);
     const [payments, wallet] = await Promise.all([
       listPaymentTransactions(),
       getWalletBalance().catch(() => ({
@@ -45,6 +48,7 @@ function AdminPaymentsPage() {
   const { payments, wallet } = Route.useLoaderData();
   const deposit = useServerFn(initiateAdminDeposit);
   const withdraw = useServerFn(initiateAdminWithdrawal);
+  const reconcile = useServerFn(reconcilePendingWalletPayments);
 
   const [depositPhone, setDepositPhone] = useState("");
   const [depositAmount, setDepositAmount] = useState("5");
@@ -53,6 +57,7 @@ function AdminPaymentsPage() {
   const [withdrawPhone, setWithdrawPhone] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("5000");
   const [withdrawing, setWithdrawing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
 
   const feesCollected = payments
     .filter((p) => p.kind === "processing_fee" && p.status === "success")
@@ -112,6 +117,26 @@ function AdminPaymentsPage() {
       toast.error(stripServerPrefix(raw));
     } finally {
       setWithdrawing(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    setReconciling(true);
+    try {
+      const result = await reconcile();
+      if (result.updated.length > 0) {
+        toast.success(`Updated ${result.updated.length} payment(s)`, {
+          description: result.reason,
+        });
+        window.location.reload();
+        return;
+      }
+      toast.message(result.reason);
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "Could not refresh payment status";
+      toast.error(stripServerPrefix(raw));
+    } finally {
+      setReconciling(false);
     }
   };
 
@@ -243,6 +268,21 @@ function AdminPaymentsPage() {
         </div>
 
         <div className="card-soft overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-6 py-3 border-b">
+            <p className="text-sm text-muted-foreground">
+              Rows update from M-Pesa callbacks. Use Refresh status if a deposit cleared but still shows pending.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={reconciling}
+              onClick={() => void handleReconcile()}
+              className="shrink-0 rounded-xl"
+            >
+              {reconciling ? "Refreshing…" : "Refresh status"}
+            </Button>
+          </div>
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>

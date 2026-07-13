@@ -306,6 +306,81 @@ export const getPaymentStatus = createServerFn({ method: "GET" })
     return { reference: payment.reference, status: payment.status };
   });
 
+/**
+ * When SMPLY never posts webhooks, align pending deposit/withdrawal rows with the
+ * live wallet balance (exact gap match preferred).
+ */
+export const reconcilePendingWalletPayments = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const adminId = await requireAdmin();
+    const { getDb } = await import("@/lib/db");
+    const { getSmplyWalletBalance, planWalletReconcile } = await import("@/lib/smply-pay.server");
+    const db = await getDb();
+    const wallet = await getSmplyWalletBalance();
+    if (!wallet.available) {
+      return {
+        ok: false as const,
+        updated: [] as string[],
+        reason: "Wallet balance unavailable from SMPLY Pay",
+        walletBalance: undefined as number | undefined,
+      };
+    }
+
+    const payments = await db.collection<PaymentRecord>("payments").find({}).toArray();
+    const successfulDeposits = payments
+      .filter((p) => p.kind === "deposit" && p.status === "success")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const successfulWithdrawals = payments
+      .filter((p) => p.kind === "withdrawal" && p.status === "success")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const pendingDeposits = payments
+      .filter((p) => p.kind === "deposit" && p.status === "pending")
+      .map((p) => ({ reference: p.reference, amount: p.amount, createdAt: p.createdAt }));
+
+    const plan = planWalletReconcile({
+      walletBalance: wallet.balance,
+      successfulDeposits,
+      successfulWithdrawals,
+      pendingDeposits,
+    });
+
+    if (plan.markSuccess.length === 0) {
+      return {
+        ok: true as const,
+        updated: [] as string[],
+        reason: plan.reason,
+        walletBalance: wallet.balance,
+      };
+    }
+
+    const now = new Date();
+    await db.collection<PaymentRecord>("payments").updateMany(
+      { reference: { $in: plan.markSuccess }, status: "pending" },
+      {
+        $set: {
+          status: "success",
+          failureReason: `Reconciled from wallet balance (${plan.reason})`,
+          updatedAt: now,
+        },
+      },
+    );
+
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
+    await logAuditEvent({
+      actor: adminId,
+      action: `Reconciled ${plan.markSuccess.length} payment(s) from wallet`,
+      target: plan.markSuccess.join(", "),
+    });
+
+    return {
+      ok: true as const,
+      updated: plan.markSuccess,
+      reason: plan.reason,
+      walletBalance: wallet.balance,
+    };
+  },
+);
+
 /** After processing fee success: queue for team CRB checks (do not disburse). */
 export async function markApplicationUnderReview(applicationNumber: string) {
   await requireSuccessfulProcessingFee(applicationNumber);

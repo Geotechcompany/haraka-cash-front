@@ -532,49 +532,165 @@ export async function initiateSmplyWithdrawal(input: {
   return interpretSmplyWithdrawResponse({ reference: input.reference, raw });
 }
 
-export function parseSmplyWebhook(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return { reference: undefined, status: "failed" as const, providerRef: undefined, reason: "Invalid callback payload" };
+/** Flatten nested SMPLY / Safaricom-style callback envelopes into one lookup surface. */
+function flattenWebhookLayers(payload: Record<string, unknown>): Record<string, unknown> {
+  const nestKeys = ["data", "Body", "body", "Result", "result", "stkCallback", "StkCallback"];
+  const layers: Record<string, unknown>[] = [payload];
+  const queue: Record<string, unknown>[] = [payload];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const key of nestKeys) {
+      const nested = current[key];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        const record = nested as Record<string, unknown>;
+        layers.push(record);
+        queue.push(record);
+      }
+    }
   }
 
-  const data = payload as Record<string, unknown>;
-  const rawReference = pickString(data, [
+  const merged: Record<string, unknown> = {};
+  for (const layer of layers) {
+    Object.assign(merged, layer);
+  }
+  return merged;
+}
+
+/** Read string-or-number callback fields (ResultCode is often numeric 0). */
+function pickScalar(data: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === "string" && value.length > 0) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+export type SmplyWebhookParseResult = {
+  reference?: string;
+  providerRef?: string;
+  status: "pending" | "success" | "failed";
+  reason?: string;
+};
+
+export function parseSmplyWebhook(payload: unknown): SmplyWebhookParseResult {
+  if (!payload || typeof payload !== "object") {
+    return {
+      reference: undefined,
+      status: "failed",
+      providerRef: undefined,
+      reason: "Invalid callback payload",
+    };
+  }
+
+  const data = flattenWebhookLayers(payload as Record<string, unknown>);
+  const rawReference = pickScalar(data, [
     "reference",
     "transactionId",
     "transaction_id",
     "account_reference",
     "AccountReference",
+    "BillRefNumber",
   ]);
   const reference = rawReference ? fromStkTransactionId(rawReference) : undefined;
-  const providerRef = pickString(data, [
-    "transaction_id",
-    "transactionId",
+  const providerRef = pickScalar(data, [
+    "MpesaReceiptNumber",
+    "mpesa_receipt_number",
     "checkout_request_id",
     "CheckoutRequestID",
     "withdrawal_id",
-    "MpesaReceiptNumber",
+    "ConversationID",
+    "OriginatorConversationID",
     "orderCode",
+    "order_number",
+    "orderNumber",
+    "transaction_id",
+    "transactionId",
     "id",
   ]);
-  const resultCode = pickString(data, ["result_code", "ResultCode", "code"]);
-  const statusValue = pickString(data, ["status", "state", "ResultDesc"]);
-  const reason = pickString(data, ["reason", "message", "ResultDesc", "error"]);
 
+  // Safaricom ResultCode "0" = success. Do not treat SMPLY initiate `code: 1` as failure.
+  const safaricomResultCode = pickScalar(data, ["result_code", "ResultCode"]);
+  const statusValue = pickScalar(data, ["status", "state"])?.toLowerCase();
+  const resultDesc = pickScalar(data, ["ResultDesc", "result_desc", "resultDesc"]);
+  const reason = pickScalar(data, ["reason", "message", "ResultDesc", "error"]);
+
+  // Never treat bare provider message "Success" as paid — that only means accepted on STK/B2C initiate.
   const success =
-    resultCode === "0" ||
+    safaricomResultCode === "0" ||
     statusValue === "success" ||
     statusValue === "completed" ||
-    statusValue === "The service request is processed successfully.";
+    statusValue === "paid" ||
+    statusValue === "successful" ||
+    resultDesc === "The service request is processed successfully.";
 
   const failed =
-    (resultCode !== undefined && resultCode !== "0") ||
+    (safaricomResultCode !== undefined && safaricomResultCode !== "0") ||
     statusValue === "failed" ||
-    statusValue === "cancelled";
+    statusValue === "cancelled" ||
+    statusValue === "canceled";
 
   return {
     reference,
     providerRef,
-    status: success ? ("success" as const) : failed ? ("failed" as const) : ("pending" as const),
+    status: success ? "success" : failed ? "failed" : "pending",
     reason,
+  };
+}
+
+/** Decide which pending deposits to mark success so books match the live wallet.
+ * Withdrawals are never auto-reconciled — only webhooks (or an explicit admin action) may mark them paid.
+ */
+export function planWalletReconcile(input: {
+  walletBalance: number;
+  successfulDeposits: number;
+  successfulWithdrawals: number;
+  pendingDeposits: Array<{ reference: string; amount: number; createdAt: Date | string }>;
+  pendingWithdrawals?: Array<{ reference: string; amount: number; createdAt: Date | string }>;
+}): { markSuccess: string[]; reason: string } {
+  const booked = input.successfulDeposits - input.successfulWithdrawals;
+  const gap = Math.round((input.walletBalance - booked) * 100) / 100;
+
+  if (gap === 0) {
+    return { markSuccess: [], reason: "Wallet already matches successful payments" };
+  }
+
+  if (gap < 0) {
+    return {
+      markSuccess: [],
+      reason: `Books exceed wallet by KES ${-gap}; pending withdrawals stay pending until a callback arrives`,
+    };
+  }
+
+  const pending = [...input.pendingDeposits].sort(
+    (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+  );
+  const exact = pending.find((row) => row.amount === gap);
+  if (exact) {
+    return {
+      markSuccess: [exact.reference],
+      reason: `Deposit ${exact.reference} matches wallet gap of KES ${gap}`,
+    };
+  }
+
+  const markSuccess: string[] = [];
+  let remaining = gap;
+  for (const row of pending) {
+    if (row.amount <= remaining) {
+      markSuccess.push(row.reference);
+      remaining = Math.round((remaining - row.amount) * 100) / 100;
+      if (remaining === 0) break;
+    }
+  }
+  if (remaining !== 0 || markSuccess.length === 0) {
+    return {
+      markSuccess: [],
+      reason: `Wallet gap KES ${gap} cannot be explained by pending deposits`,
+    };
+  }
+  return {
+    markSuccess,
+    reason: `Marked ${markSuccess.length} deposit(s) totaling KES ${gap}`,
   };
 }

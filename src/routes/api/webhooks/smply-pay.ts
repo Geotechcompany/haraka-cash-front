@@ -14,6 +14,7 @@ export const Route = createFileRoute("/api/webhooks/smply-pay")({
           });
         }
 
+        console.info("[smply-pay webhook]", JSON.stringify(payload).slice(0, 2000));
         const { handleSmplyPayWebhook } = await import("@/server/payments-webhook.server");
         const result = await handleSmplyPayWebhook(payload);
         return new Response(JSON.stringify(result), {

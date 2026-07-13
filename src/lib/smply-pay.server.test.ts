@@ -9,6 +9,7 @@ import {
   interpretSmplyStkResponse,
   interpretSmplyWithdrawResponse,
   parseSmplyWebhook,
+  planWalletReconcile,
   toSmplyPhoneNumber,
   toStkTransactionId,
 } from "@/lib/smply-pay.server";
@@ -139,6 +140,71 @@ test("parseSmplyWebhook maps branded STK transactionId to internal reference", (
   });
   assert.equal(parsed.reference, "FEE-99-XYZ");
   assert.equal(parsed.status, "success");
+});
+
+test("parseSmplyWebhook treats branded deposit callback as success without confusing code:1", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-173935882861-SK4I8T",
+    ResultCode: 0,
+    ResultDesc: "The service request is processed successfully.",
+    MpesaReceiptNumber: "ABC123",
+    code: 1,
+    message: "Success",
+  });
+  assert.equal(parsed.reference, "DEP-173935882861-SK4I8T");
+  assert.equal(parsed.status, "success");
+  assert.equal(parsed.providerRef, "ABC123");
+});
+
+test("parseSmplyWebhook does not mark bare message Success as paid", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-PENDING",
+    code: 1,
+    message: "Success",
+  });
+  assert.equal(parsed.reference, "DEP-PENDING");
+  assert.equal(parsed.status, "pending");
+});
+
+test("parseSmplyWebhook reads nested Body/stkCallback envelopes", () => {
+  const parsed = parseSmplyWebhook({
+    Body: {
+      stkCallback: {
+        ResultCode: 0,
+        ResultDesc: "The service request is processed successfully.",
+        transactionId: "HARAKA-CASH-KENYA-DEP-NESTED-1",
+      },
+    },
+  });
+  assert.equal(parsed.reference, "DEP-NESTED-1");
+  assert.equal(parsed.status, "success");
+});
+
+test("planWalletReconcile marks exact pending deposit matching wallet gap", () => {
+  const plan = planWalletReconcile({
+    walletBalance: 5,
+    successfulDeposits: 0,
+    successfulWithdrawals: 0,
+    pendingDeposits: [
+      { reference: "DEP-10", amount: 10, createdAt: "2026-01-01T00:00:00.000Z" },
+      { reference: "DEP-5", amount: 5, createdAt: "2026-01-02T00:00:00.000Z" },
+    ],
+  });
+  assert.deepEqual(plan.markSuccess, ["DEP-5"]);
+});
+
+test("planWalletReconcile never auto-marks withdrawals when books exceed wallet", () => {
+  const plan = planWalletReconcile({
+    walletBalance: 10,
+    successfulDeposits: 15,
+    successfulWithdrawals: 0,
+    pendingDeposits: [],
+    pendingWithdrawals: [
+      { reference: "WD-5", amount: 5, createdAt: "2026-01-02T00:00:00.000Z" },
+    ],
+  });
+  assert.deepEqual(plan.markSuccess, []);
+  assert.match(plan.reason, /Withdrawals stay pending|exceed wallet/i);
 });
 
 test("interpretSmplyStkResponse treats bare Success as pending prompt, not paid", () => {
