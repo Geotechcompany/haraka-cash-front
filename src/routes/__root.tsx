@@ -11,7 +11,7 @@ import {
 import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { ThemeProvider } from "@/lib/theme";
+import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { CookieConsentBanner } from "@/components/legal/cookie-consent-banner";
 import { ReferralBootstrap } from "@/components/referrals/referral-bootstrap";
@@ -88,8 +88,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <head><HeadContent /></head>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body>
         <ThemeProvider>
           <ThemedClerkProvider>{children}</ThemedClerkProvider>
