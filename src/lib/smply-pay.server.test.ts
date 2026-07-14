@@ -180,6 +180,82 @@ test("parseSmplyWebhook reads nested Body/stkCallback envelopes", () => {
   assert.equal(parsed.status, "success");
 });
 
+test("parseSmplyWebhook treats SmplypayCallback success shape as paid", () => {
+  const parsed = parseSmplyWebhook({
+    name: "Jane Doe",
+    phoneNumber: "0757344328",
+    amount: 500,
+    projectCode: "WLT-CD-1MRWANZ",
+    transactionId: "HARAKA-CASH-KENYA-FEE-ABC",
+    receiptNumber: "QGH7X8Y9Z",
+    action: "stk_callback",
+    status: 0,
+  });
+  assert.equal(parsed.reference, "FEE-ABC");
+  assert.equal(parsed.providerRef, "QGH7X8Y9Z");
+  assert.equal(parsed.status, "success");
+  assert.equal(parsed.amount, 500);
+  assert.equal(parsed.phoneNumber, "0757344328");
+  assert.equal(parsed.action, "stk_callback");
+});
+
+test("parseSmplyWebhook keeps status 1 without receipt as pending", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-PEND-2",
+    phoneNumber: "0757344328",
+    amount: 100,
+    status: 1,
+    message: "Success",
+  });
+  assert.equal(parsed.reference, "DEP-PEND-2");
+  assert.equal(parsed.status, "pending");
+});
+
+test("parseSmplyWebhook treats SmplypayCallback failure status as failed", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-FAIL",
+    status: 2,
+    message: "Cancelled by user",
+  });
+  assert.equal(parsed.reference, "DEP-FAIL");
+  assert.equal(parsed.status, "failed");
+});
+
+test("parseSmplyWebhook maps receiptNumber to providerRef", () => {
+  const parsed = parseSmplyWebhook({
+    receiptNumber: "QGH123456",
+    transactionId: "HARAKA-CASH-KENYA-DEP-1",
+    status: 0,
+  });
+  assert.equal(parsed.providerRef, "QGH123456");
+  assert.equal(parsed.reference, "DEP-1");
+});
+
+test("parseSmplyWebhook reads nested transactionData JSON", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-TD",
+    status: 1,
+    transactionData: JSON.stringify({
+      receiptNumber: "REC999",
+      status: 0,
+      ResultCode: 0,
+    }),
+  });
+  assert.equal(parsed.providerRef, "REC999");
+  assert.equal(parsed.status, "success");
+});
+
+test("parseSmplyWebhook accepts camelCase receiptNumber on Safaricom-style payload", () => {
+  const parsed = parseSmplyWebhook({
+    transactionId: "HARAKA-CASH-KENYA-DEP-CAMEL",
+    receiptNumber: "XYZ987",
+    ResultCode: 0,
+    status: 1,
+  });
+  assert.equal(parsed.providerRef, "XYZ987");
+  assert.equal(parsed.status, "success");
+});
+
 test("planWalletReconcile marks exact pending deposit matching wallet gap", () => {
   const plan = planWalletReconcile({
     walletBalance: 5,

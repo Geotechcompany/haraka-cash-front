@@ -45,12 +45,34 @@ export async function handleSmplyPayWebhook(payload: unknown) {
     };
   }
 
+  if (parsed.amount !== undefined) {
+    const callbackAmount = Math.round(parsed.amount);
+    const paymentAmount = Math.round(payment.amount);
+    if (callbackAmount !== paymentAmount) {
+      console.warn(
+        `[smply-pay webhook] amount mismatch for ${payment.reference}: callback=${callbackAmount} payment=${paymentAmount}`,
+      );
+      return {
+        ok: false,
+        reason: "Amount mismatch",
+        reference: payment.reference,
+        expected: paymentAmount,
+        received: callbackAmount,
+      };
+    }
+  }
+
   const status: PaymentStatus =
     parsed.status === "success"
       ? "success"
       : parsed.status === "failed"
         ? "failed"
         : payment.status;
+
+  const providerRef =
+    parsed.status === "success" && parsed.providerRef
+      ? parsed.providerRef
+      : (parsed.providerRef ?? payment.providerRef);
 
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
@@ -59,8 +81,9 @@ export async function handleSmplyPayWebhook(payload: unknown) {
     {
       $set: {
         status,
-        providerRef: parsed.providerRef ?? payment.providerRef,
+        providerRef,
         failureReason: parsed.reason,
+        providerResponse: payload,
         updatedAt: new Date(),
       },
     },

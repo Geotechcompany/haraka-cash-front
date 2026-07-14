@@ -532,6 +532,19 @@ export async function initiateSmplyWithdrawal(input: {
   return interpretSmplyWithdrawResponse({ reference: input.reference, raw });
 }
 
+function parseTransactionDataLayer(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 /** Flatten nested SMPLY / Safaricom-style callback envelopes into one lookup surface. */
 function flattenWebhookLayers(payload: Record<string, unknown>): Record<string, unknown> {
   const nestKeys = ["data", "Body", "body", "Result", "result", "stkCallback", "StkCallback"];
@@ -540,6 +553,11 @@ function flattenWebhookLayers(payload: Record<string, unknown>): Record<string, 
 
   while (queue.length > 0) {
     const current = queue.shift()!;
+    const transactionData = parseTransactionDataLayer(current.transactionData);
+    if (transactionData) {
+      layers.push(transactionData);
+      queue.push(transactionData);
+    }
     for (const key of nestKeys) {
       const nested = current[key];
       if (nested && typeof nested === "object" && !Array.isArray(nested)) {
@@ -572,7 +590,24 @@ export type SmplyWebhookParseResult = {
   providerRef?: string;
   status: "pending" | "success" | "failed";
   reason?: string;
+  amount?: number;
+  phoneNumber?: string;
+  action?: string;
 };
+
+/** SmplypayCallback.Status: 1 = new/pending (GORM default), 0 = paid, 2+ = failed/cancelled. */
+function interpretSmplyNumericStatus(
+  status: number | undefined,
+  receiptPresent: boolean,
+): "pending" | "success" | "failed" | undefined {
+  if (status === undefined) {
+    return receiptPresent ? "success" : undefined;
+  }
+  if (status === 0) return "success";
+  if (status === 1) return "pending";
+  if (status === 2 || status === 3 || status < 0) return "failed";
+  return undefined;
+}
 
 export function parseSmplyWebhook(payload: unknown): SmplyWebhookParseResult {
   if (!payload || typeof payload !== "object") {
@@ -594,27 +629,46 @@ export function parseSmplyWebhook(payload: unknown): SmplyWebhookParseResult {
     "BillRefNumber",
   ]);
   const reference = rawReference ? fromStkTransactionId(rawReference) : undefined;
-  const providerRef = pickScalar(data, [
+  const receiptNumber = pickScalar(data, [
+    "receiptNumber",
+    "ReceiptNumber",
     "MpesaReceiptNumber",
     "mpesa_receipt_number",
-    "checkout_request_id",
-    "CheckoutRequestID",
-    "withdrawal_id",
-    "ConversationID",
-    "OriginatorConversationID",
-    "orderCode",
-    "order_number",
-    "orderNumber",
-    "transaction_id",
-    "transactionId",
-    "id",
   ]);
+  const providerRef =
+    receiptNumber ??
+    pickScalar(data, [
+      "checkout_request_id",
+      "CheckoutRequestID",
+      "withdrawal_id",
+      "ConversationID",
+      "OriginatorConversationID",
+      "orderCode",
+      "order_number",
+      "orderNumber",
+      "transaction_id",
+      "transactionId",
+      "id",
+    ]);
+
+  const amount = pickNumber(data, ["amount", "Amount"]);
+  const phoneNumber = pickScalar(data, ["phoneNumber", "phone_number", "PhoneNumber"]);
+  const action = pickScalar(data, ["action", "Action"]);
 
   // Safaricom ResultCode "0" = success. Do not treat SMPLY initiate `code: 1` as failure.
   const safaricomResultCode = pickScalar(data, ["result_code", "ResultCode"]);
-  const statusValue = pickScalar(data, ["status", "state"])?.toLowerCase();
+  const rawStatus = data.status ?? data.state;
+  const numericStatus =
+    typeof rawStatus === "number" && Number.isFinite(rawStatus) ? rawStatus : undefined;
+  const statusValue =
+    typeof rawStatus === "string"
+      ? rawStatus.trim().toLowerCase()
+      : numericStatus === undefined
+        ? pickScalar(data, ["status", "state"])?.toLowerCase()
+        : undefined;
   const resultDesc = pickScalar(data, ["ResultDesc", "result_desc", "resultDesc"]);
   const reason = pickScalar(data, ["reason", "message", "ResultDesc", "error"]);
+  const smplyStatus = interpretSmplyNumericStatus(numericStatus, Boolean(receiptNumber));
 
   // Never treat bare provider message "Success" as paid — that only means accepted on STK/B2C initiate.
   const success =
@@ -623,19 +677,24 @@ export function parseSmplyWebhook(payload: unknown): SmplyWebhookParseResult {
     statusValue === "completed" ||
     statusValue === "paid" ||
     statusValue === "successful" ||
-    resultDesc === "The service request is processed successfully.";
+    resultDesc === "The service request is processed successfully." ||
+    smplyStatus === "success";
 
   const failed =
     (safaricomResultCode !== undefined && safaricomResultCode !== "0") ||
     statusValue === "failed" ||
     statusValue === "cancelled" ||
-    statusValue === "canceled";
+    statusValue === "canceled" ||
+    smplyStatus === "failed";
 
   return {
     reference,
     providerRef,
     status: success ? "success" : failed ? "failed" : "pending",
     reason,
+    amount,
+    phoneNumber,
+    action,
   };
 }
 
