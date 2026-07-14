@@ -127,6 +127,8 @@ function looksUserSafe(message: string): boolean {
   if (/^[\[{]/.test(message)) return false;
   if (/\bat\s+\S+\.(ts|js|tsx|jsx):\d+/i.test(message)) return false;
   if (/^(TypeError|ReferenceError|SyntaxError|ZodError):/i.test(message)) return false;
+  if (/\b(undefined|null|is not (?:a function|an object))\b/i.test(message)) return false;
+  if (/cannot read propert/i.test(message)) return false;
   return /[a-zA-Z]/.test(message);
 }
 
