@@ -101,6 +101,12 @@ export type Application = {
   createdAt: string;
 };
 
+export function applicationNeedsProcessingFee(
+  app: Pick<Application, "status" | "feesPaid">,
+): boolean {
+  return statusAwaitsProcessingFee(app.status) && !app.feesPaid;
+}
+
 /** Phone used for loan-related STK (prefer apply-form M-Pesa number). */
 export function applicationStkPhone(doc: Pick<ApplicationRecord, "mpesaNumber" | "phone">): string {
   const mpesa = doc.mpesaNumber?.trim();

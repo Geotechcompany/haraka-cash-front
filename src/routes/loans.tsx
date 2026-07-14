@@ -1,13 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Search, Plus, CheckCircle2, Clock, XCircle, ArrowRight } from "lucide-react";
+import { Search, Plus, CheckCircle2, Clock, XCircle, ArrowRight, Smartphone } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { kes } from "@/lib/loan";
-import { applicationStatusLabel } from "@/lib/models/application";
+import {
+  applicationNeedsProcessingFee,
+  applicationStatusLabel,
+  type Application,
+} from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { listApplications } from "@/server/applications";
 
@@ -30,6 +34,63 @@ const statusStyles: Record<string, string> = {
 
 const springEnter = { type: "spring" as const, bounce: 0, duration: 0.35 };
 const STAGGER = 0.045;
+
+function loanProgressSteps(app: Application) {
+  const crbDone = app.status === "Disbursing" || app.status === "Completed";
+  const crbInProgress = app.status === "UnderReview";
+  const disbursing = app.status === "Disbursing";
+
+  return [
+    {
+      l: "Fee paid",
+      done: app.feesPaid,
+      icon: app.feesPaid ? CheckCircle2 : Clock,
+    },
+    {
+      l: "CRB review",
+      done: crbDone,
+      icon: crbInProgress ? Clock : crbDone ? CheckCircle2 : Clock,
+    },
+    {
+      l: "Disbursed",
+      done: app.status === "Completed",
+      icon: disbursing ? Clock : app.status === "Completed" ? CheckCircle2 : Clock,
+    },
+    {
+      l: "Repayment",
+      done: app.status === "Completed",
+      icon: Clock,
+    },
+  ];
+}
+
+function PayProcessingFeeButton({
+  applicationId,
+  feeAmount,
+  size = "default",
+  className,
+}: {
+  applicationId: string;
+  feeAmount?: number;
+  size?: "default" | "sm";
+  className?: string;
+}) {
+  return (
+    <Button
+      asChild
+      size={size}
+      className={cn("rounded-xl gradient-brand text-white shadow-soft", className)}
+    >
+      <Link to="/decision" search={{ applicationId }}>
+        <Smartphone className="mr-1 h-4 w-4" />
+        Pay processing fee
+        {feeAmount != null ? (
+          <span className="ml-1 tabular-nums opacity-90">· {kes(feeAmount)}</span>
+        ) : null}
+      </Link>
+    </Button>
+  );
+}
 
 function LoansPage() {
   const applications = Route.useLoaderData();
@@ -94,28 +155,26 @@ function LoansPage() {
               {applicationStatusLabel(activeLoan.status)}
             </span>
           </div>
+          {applicationNeedsProcessingFee(activeLoan) ? (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Processing fee required</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Pay via M-Pesa to start CRB review and disbursement.
+                  {activeLoan.feeAmount != null ? (
+                    <> Fee: {kes(activeLoan.feeAmount)}.</>
+                  ) : null}
+                </p>
+              </div>
+              <PayProcessingFeeButton
+                applicationId={activeLoan.id}
+                feeAmount={activeLoan.feeAmount}
+                className="h-11 shrink-0"
+              />
+            </div>
+          ) : null}
           <ol className="grid gap-2 sm:grid-cols-4 sm:gap-3">
-            {[
-              {
-                l: "Fee paid",
-                done:
-                  activeLoan.feesPaid ||
-                  activeLoan.status === "UnderReview" ||
-                  activeLoan.status === "Disbursing",
-                icon: CheckCircle2,
-              },
-              {
-                l: "CRB review",
-                done: activeLoan.status === "Disbursing",
-                icon: activeLoan.status === "UnderReview" ? Clock : CheckCircle2,
-              },
-              {
-                l: "Disbursed",
-                done: activeLoan.status === "Disbursing",
-                icon: CheckCircle2,
-              },
-              { l: "Repayment", done: false, icon: Clock },
-            ].map((step) => (
+            {loanProgressSteps(activeLoan).map((step) => (
               <li
                 key={step.l}
                 className={cn(
@@ -201,9 +260,21 @@ function LoansPage() {
               <p className="font-semibold tracking-tight tabular-nums">{kes(a.amount)}</p>
               <p className="text-xs text-muted-foreground">Score {a.eligibilityScore}</p>
             </div>
-            <Button variant="ghost" size="sm" className="rounded-lg">
-              Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {applicationNeedsProcessingFee(a) ? (
+                <PayProcessingFeeButton
+                  applicationId={a.id}
+                  feeAmount={a.feeAmount}
+                  size="sm"
+                  className="h-9"
+                />
+              ) : null}
+              <Button asChild variant="ghost" size="sm" className="rounded-lg">
+                <Link to="/decision" search={{ applicationId: a.id }}>
+                  Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
           </motion.div>
         ))}
         {filtered.length === 0 && (

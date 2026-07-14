@@ -27,7 +27,10 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { kes } from "@/lib/loan";
 import { productTypeLabel } from "@/lib/lending-products";
-import { applicationStatusLabel } from "@/lib/models/application";
+import {
+  applicationNeedsProcessingFee,
+  applicationStatusLabel,
+} from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getCurrentUser, listApplications } from "@/server/applications";
 import { getDashboardStats, getUserLoanHistory } from "@/server/analytics";
@@ -187,7 +190,7 @@ function Dashboard() {
                     Current loan
                   </p>
                   <Badge variant="secondary" className="rounded-full">
-                    {activeLoan.status}
+                    {applicationStatusLabel(activeLoan.status)}
                   </Badge>
                 </div>
                 <p className="mt-3 font-display text-3xl font-bold tracking-tight tabular-nums">
@@ -196,9 +199,27 @@ function Dashboard() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {activeLoan.months}-month term · {activeLoan.purpose}
                 </p>
-                <Button asChild variant="outline" className="mt-auto rounded-xl">
-                  <Link to="/loans">View loan</Link>
-                </Button>
+                {applicationNeedsProcessingFee(activeLoan) ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Pay the processing fee
+                    {activeLoan.feeAmount != null ? (
+                      <> ({kes(activeLoan.feeAmount)})</>
+                    ) : null}{" "}
+                    to continue.
+                  </p>
+                ) : null}
+                <div className="mt-auto flex flex-col gap-2 pt-4">
+                  {applicationNeedsProcessingFee(activeLoan) ? (
+                    <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
+                      <Link to="/decision" search={{ applicationId: activeLoan.id }}>
+                        Pay processing fee
+                      </Link>
+                    </Button>
+                  ) : null}
+                  <Button asChild variant="outline" className="rounded-xl">
+                    <Link to="/loans">View loan</Link>
+                  </Button>
+                </div>
               </>
             ) : (
               <>
