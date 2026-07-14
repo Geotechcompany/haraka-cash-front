@@ -15,6 +15,7 @@ import {
   referralShortLinkPath,
 } from "@/lib/referral";
 import { requireAdmin, requireUserId } from "@/server/auth";
+import { ensureUser } from "@/server/ensure-user";
 
 async function allocateUniqueReferralCode(): Promise<string> {
   const { getDb } = await import("@/lib/db");
@@ -243,15 +244,11 @@ export type ReferralProgramStats = {
 export const getReferralProgram = createServerFn({ method: "GET" }).handler(
   async (): Promise<ReferralProgramStats> => {
     const clerkId = await requireUserId();
-    const { getDb } = await import("@/lib/db");
-    const db = await getDb();
-    const existing = await db.collection<UserRecord>("users").findOne({ clerkId });
-    if (!existing) {
-      throw new Error("User not found");
-    }
-    const user = await ensureReferralCode(existing);
+    const user = await ensureReferralCode(await ensureUser(clerkId));
     const code = user.referralCode!;
 
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
     const { getReferralClickStats } = await import("@/server/referral-clicks.server");
     const [recentDocs, clickStats] = await Promise.all([
       db

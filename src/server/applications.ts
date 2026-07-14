@@ -1,4 +1,4 @@
-import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -25,6 +25,7 @@ import { buildLoanQuote } from "@/lib/loan";
 import { isValidKenyanNationalId, isValidKenyanPhone } from "@/lib/kenya-format";
 import { applicationStatusForReview, statusRequiresConfirmedProcessingFee } from "@/lib/admin-domain";
 import { requireAdmin, requireUserId } from "@/server/auth";
+import { ensureUser } from "@/server/ensure-user";
 
 /** Application numbers with a confirmed successful processing-fee payment. */
 async function successfulProcessingFeeNumbers(applicationNumbers: string[]) {
@@ -93,40 +94,6 @@ async function reconcileFeeGateStatuses(
   }
 
   return docs;
-}
-
-async function ensureUser(clerkId: string) {
-  const { getDb } = await import("@/lib/db");
-  const db = await getDb();
-  const existing = await db.collection<UserRecord>("users").findOne({ clerkId });
-  if (existing) {
-    const { ensureReferralCode } = await import("@/server/referrals");
-    return ensureReferralCode(existing);
-  }
-
-  const clerk = await clerkClient();
-  const profile = await clerk.users.getUser(clerkId).catch(() => null);
-  const now = new Date();
-  const { allocateReferralCodeForNewUser } = await import("@/server/referrals");
-  const referralCode = await allocateReferralCodeForNewUser();
-  const doc: UserRecord = {
-    clerkId,
-    email: profile?.emailAddresses[0]?.emailAddress,
-    firstName: profile?.firstName ?? undefined,
-    lastName: profile?.lastName ?? undefined,
-    phone: profile?.phoneNumbers[0]?.phoneNumber,
-    eligibilityScore: 0,
-    availableCredit: 0,
-    referralCode,
-    referralCreditsEarned: 0,
-    referralCount: 0,
-    profileComplete: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await db.collection<UserRecord>("users").insertOne(doc);
-  return doc;
 }
 
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {

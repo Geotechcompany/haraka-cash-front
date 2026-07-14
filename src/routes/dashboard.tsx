@@ -43,13 +43,18 @@ import { cn } from "@/lib/utils";
 import { getCurrentUser, listApplications } from "@/server/applications";
 import { getDashboardStats, getUserLoanHistory } from "@/server/analytics";
 import { listNotifications } from "@/server/notifications";
+import { withTransientAuthRetry } from "@/lib/transient-auth-retry";
 import { getReferralProgram } from "@/server/referrals";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — HarakaCash" }] }),
   loader: async () => {
-    const [user, applications, notifications, loanHistory, stats, referrals] = await Promise.all([
-      getCurrentUser(),
+    const user = await withTransientAuthRetry(async () => {
+      const profile = await getCurrentUser();
+      if (!profile) throw new Error("Unauthorized");
+      return profile;
+    });
+    const [applications, notifications, loanHistory, stats, referrals] = await Promise.all([
       listApplications({ data: { scope: "mine" } }),
       listNotifications(),
       getUserLoanHistory(),

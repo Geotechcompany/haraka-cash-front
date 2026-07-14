@@ -22,9 +22,14 @@ export function ReferralBootstrap() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get("ref");
+    const url = new URL(window.location.href);
+    const ref = url.searchParams.get("ref");
     if (ref) persistReferralCode(ref);
+    if (url.searchParams.has("__clerk_netlify_cache_bust")) {
+      url.searchParams.delete("__clerk_netlify_cache_bust");
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(window.history.state, "", next);
+    }
   }, []);
 
   useEffect(() => {

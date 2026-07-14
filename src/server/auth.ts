@@ -2,9 +2,15 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { redirect } from "@tanstack/react-router";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { isAdminMetadata } from "@/lib/admin-domain";
+import { sleep } from "@/lib/transient-auth-retry";
 
 export const requireUserId = createServerOnlyFn(async () => {
-  const { userId } = await auth();
+  let userId: string | null | undefined;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    ({ userId } = await auth());
+    if (userId) break;
+    if (attempt < 3) await sleep(150 * (attempt + 1));
+  }
   if (!userId) throw new Error("Unauthorized");
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
