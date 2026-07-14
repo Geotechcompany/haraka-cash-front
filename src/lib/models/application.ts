@@ -107,6 +107,26 @@ export function applicationNeedsProcessingFee(
   return statusAwaitsProcessingFee(app.status) && !app.feesPaid;
 }
 
+/** Borrower has a live loan in disbursement or repayment (not pre-disbursement offer steps). */
+export function isActiveDisbursedLoan(status: ApplicationStatus | string): boolean {
+  return status === "Disbursing";
+}
+
+/** Approved offer still moving through fee payment, CRB review, or pre-disbursement. */
+export function isPendingOfferPipeline(status: ApplicationStatus | string): boolean {
+  return (
+    status === "Approved" ||
+    status === "AdditionalActionRequired" ||
+    status === "UnderReview"
+  );
+}
+
+export function pendingOfferHeadline(app: Pick<Application, "status" | "feesPaid">): string {
+  if (applicationNeedsProcessingFee(app)) return "Offer pending";
+  if (app.status === "UnderReview") return "Under review";
+  return "Offer in progress";
+}
+
 /** Phone used for loan-related STK (prefer apply-form M-Pesa number). */
 export function applicationStkPhone(doc: Pick<ApplicationRecord, "mpesaNumber" | "phone">): string {
   const mpesa = doc.mpesaNumber?.trim();

@@ -30,6 +30,9 @@ import { productTypeLabel } from "@/lib/lending-products";
 import {
   applicationNeedsProcessingFee,
   applicationStatusLabel,
+  isActiveDisbursedLoan,
+  isPendingOfferPipeline,
+  pendingOfferHeadline,
 } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getCurrentUser, listApplications } from "@/server/applications";
@@ -77,13 +80,9 @@ function Dashboard() {
   const { user, applications, notifications, loanHistory, stats, referrals } = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
   const recent = applications.slice(0, 5);
-  const activeLoan = applications.find(
-    (a) =>
-      a.status === "Approved" ||
-      a.status === "AdditionalActionRequired" ||
-      a.status === "Disbursing" ||
-      a.status === "UnderReview",
-  );
+  const activeLoan = applications.find((a) => isActiveDisbursedLoan(a.status));
+  const pendingOffer = applications.find((a) => isPendingOfferPipeline(a.status));
+  const featuredApp = activeLoan ?? pendingOffer;
   const unread = notifications.filter((n) => n.unread).length;
   const profilePct = user?.profileComplete ?? 0;
   const score = user?.eligibilityScore ?? 0;
@@ -183,41 +182,47 @@ function Dashboard() {
 
         <motion.aside {...sideMotion} className="flex flex-col gap-4 lg:col-span-2">
           <div className="card-soft flex flex-1 flex-col p-5 md:p-6">
-            {activeLoan ? (
+            {featuredApp ? (
               <>
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                    Current loan
+                    {activeLoan ? "Current loan" : pendingOfferHeadline(featuredApp)}
                   </p>
                   <Badge variant="secondary" className="rounded-full">
-                    {applicationStatusLabel(activeLoan.status)}
+                    {applicationStatusLabel(featuredApp.status)}
                   </Badge>
                 </div>
                 <p className="mt-3 font-display text-3xl font-bold tracking-tight tabular-nums">
-                  {kes(activeLoan.amount)}
+                  {kes(featuredApp.amount)}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {activeLoan.months}-month term · {activeLoan.purpose}
+                  {featuredApp.months}-month term · {featuredApp.purpose}
                 </p>
-                {applicationNeedsProcessingFee(activeLoan) ? (
+                {applicationNeedsProcessingFee(featuredApp) ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Pay the processing fee
-                    {activeLoan.feeAmount != null ? (
-                      <> ({kes(activeLoan.feeAmount)})</>
+                    {featuredApp.feeAmount != null ? (
+                      <> ({kes(featuredApp.feeAmount)})</>
                     ) : null}{" "}
                     to continue.
                   </p>
+                ) : pendingOffer ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {featuredApp.status === "UnderReview"
+                      ? "CRB review in progress. Disbursement follows approval."
+                      : "Complete the steps below to receive your funds."}
+                  </p>
                 ) : null}
                 <div className="mt-auto flex flex-col gap-2 pt-4">
-                  {applicationNeedsProcessingFee(activeLoan) ? (
+                  {applicationNeedsProcessingFee(featuredApp) ? (
                     <Button asChild className="rounded-xl gradient-brand text-white shadow-soft">
-                      <Link to="/decision" search={{ applicationId: activeLoan.id }}>
+                      <Link to="/decision" search={{ applicationId: featuredApp.id }}>
                         Pay processing fee
                       </Link>
                     </Button>
                   ) : null}
                   <Button asChild variant="outline" className="rounded-xl">
-                    <Link to="/loans">View loan</Link>
+                    <Link to="/loans">{activeLoan ? "View loan" : "View offer"}</Link>
                   </Button>
                 </div>
               </>

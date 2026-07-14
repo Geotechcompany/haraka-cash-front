@@ -10,6 +10,9 @@ import { kes } from "@/lib/loan";
 import {
   applicationNeedsProcessingFee,
   applicationStatusLabel,
+  isActiveDisbursedLoan,
+  isPendingOfferPipeline,
+  pendingOfferHeadline,
   type Application,
 } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
@@ -95,13 +98,9 @@ function PayProcessingFeeButton({
 function LoansPage() {
   const applications = Route.useLoaderData();
   const reduceMotion = useReducedMotion();
-  const activeLoan = applications.find(
-    (a) =>
-      a.status === "Approved" ||
-      a.status === "AdditionalActionRequired" ||
-      a.status === "Disbursing" ||
-      a.status === "UnderReview",
-  );
+  const activeLoan = applications.find((a) => isActiveDisbursedLoan(a.status));
+  const pendingOffer = applications.find((a) => isPendingOfferPipeline(a.status));
+  const featuredApp = activeLoan ?? pendingOffer;
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
   const filtered = applications.filter((a) => {
@@ -135,7 +134,7 @@ function LoansPage() {
         </Button>
       </div>
 
-      {activeLoan && (
+      {featuredApp && (
         <motion.div
           initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
           animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
@@ -145,36 +144,43 @@ function LoansPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
-                Active loan
+                {activeLoan ? "Active loan" : pendingOfferHeadline(featuredApp)}
               </p>
               <p className="mt-1 font-display text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
-                {kes(activeLoan.amount)}
+                {kes(featuredApp.amount)}
               </p>
             </div>
-            <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
-              {applicationStatusLabel(activeLoan.status)}
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-semibold",
+                activeLoan
+                  ? "bg-primary-soft text-primary"
+                  : "bg-warning/15 text-warning-foreground",
+              )}
+            >
+              {applicationStatusLabel(featuredApp.status)}
             </span>
           </div>
-          {applicationNeedsProcessingFee(activeLoan) ? (
+          {applicationNeedsProcessingFee(featuredApp) ? (
             <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Processing fee required</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Pay via M-Pesa to start CRB review and disbursement.
-                  {activeLoan.feeAmount != null ? (
-                    <> Fee: {kes(activeLoan.feeAmount)}.</>
+                  {featuredApp.feeAmount != null ? (
+                    <> Fee: {kes(featuredApp.feeAmount)}.</>
                   ) : null}
                 </p>
               </div>
               <PayProcessingFeeButton
-                applicationId={activeLoan.id}
-                feeAmount={activeLoan.feeAmount}
+                applicationId={featuredApp.id}
+                feeAmount={featuredApp.feeAmount}
                 className="h-11 shrink-0"
               />
             </div>
           ) : null}
           <ol className="grid gap-2 sm:grid-cols-4 sm:gap-3">
-            {loanProgressSteps(activeLoan).map((step) => (
+            {loanProgressSteps(featuredApp).map((step) => (
               <li
                 key={step.l}
                 className={cn(
