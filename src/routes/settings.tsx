@@ -1,24 +1,11 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useClerk } from "@clerk/tanstack-react-start";import { Moon, Globe, Bell, Lock, Shield, LogOut } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Moon, Globe, Bell, Lock, Shield } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "@/lib/theme";
-function SignOutButton() {
-  const { signOut } = useClerk();
-  const navigate = useNavigate();
-
-  return (
-    <Button
-      variant="ghost"
-      className="text-destructive hover:text-destructive rounded-xl"
-      onClick={() => signOut(() => navigate({ to: "/" }))}
-    >
-      <LogOut className="mr-1 h-4 w-4" /> Sign out
-    </Button>
-  );
-}
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — HarakaCash" }] }),
@@ -53,7 +40,7 @@ export const Route = createFileRoute("/settings")({
           </div>
 
           <div className="mt-6 flex justify-end">
-            <SignOutButton />
+            <SignOutButton className="rounded-xl" />
           </div>
         </div>
       </AppShell>

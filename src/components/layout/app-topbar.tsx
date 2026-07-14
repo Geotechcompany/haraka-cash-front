@@ -1,8 +1,16 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell } from "lucide-react";
+import { Bell, Menu, Settings } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -41,6 +49,50 @@ export function AppTopbar() {
           })}
         </nav>
         <div className="ml-auto flex items-center gap-0.5">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Account menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="flex w-[min(100vw-2rem,20rem)] flex-col">
+              <SheetHeader>
+                <SheetTitle>Account</SheetTitle>
+              </SheetHeader>
+              <nav className="mt-6 flex flex-1 flex-col gap-1" aria-label="Account">
+                {links.map((link) => {
+                  const active = path === link.to;
+                  return (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      className={cn(
+                        "flex min-h-11 items-center rounded-xl px-3 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary-soft text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+                <Link
+                  to="/settings"
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors",
+                    path === "/settings"
+                      ? "bg-primary-soft text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+              </nav>
+              <SignOutButton className="mt-auto w-full justify-start rounded-xl" />
+            </SheetContent>
+          </Sheet>
           <Button variant="ghost" size="icon" aria-label="Notifications" asChild>
             <Link to="/notifications">
               <Bell className="h-[18px] w-[18px]" />

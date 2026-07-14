@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Upload, Shield, Bell, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -429,6 +430,14 @@ function ProfilePage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between md:p-6">
+          <div>
+            <p className="font-semibold">Sign out</p>
+            <p className="text-sm text-muted-foreground">End your session on this device.</p>
+          </div>
+          <SignOutButton className="rounded-xl sm:shrink-0" />
+        </div>
       </div>
     </AppShell>
   );

@@ -2,10 +2,19 @@ import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, FileText, Users, Banknote, CreditCard,
-  BarChart3, Settings, LifeBuoy, ScrollText, PieChart, Gift,
+  BarChart3, Settings, LifeBuoy, ScrollText, PieChart, Gift, Menu,
 } from "lucide-react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/brand/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
@@ -59,7 +68,44 @@ export function AdminShell({ children, title, subtitle }: { children: ReactNode;
 
       <div className="lg:pl-64 flex flex-col min-h-dvh">
         <header className="sticky top-0 z-20 h-16 bg-card border-b flex items-center gap-4 px-4 sm:px-8">
-          <div className="lg:hidden">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="lg:hidden shrink-0" aria-label="Open admin menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="flex w-64 flex-col p-0">
+              <SheetHeader className="h-16 justify-center border-b px-5 text-left">
+                <SheetTitle className="sr-only">Admin navigation</SheetTitle>
+                <Logo to="/admin" height={40} className="max-w-[180px]" />
+              </SheetHeader>
+              <nav className="flex-1 overflow-y-auto p-3 space-y-0.5" aria-label="Admin">
+                {items.map((it) => {
+                  const active = it.exact ? path === it.to : path.startsWith(it.to);
+                  const Icon = it.icon;
+                  return (
+                    <Link
+                      key={it.to}
+                      to={it.to}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        active
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
+                          : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
+                      )}
+                    >
+                      <Icon className="h-[18px] w-[18px] shrink-0" />
+                      <span className="truncate">{it.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="border-t border-border p-4">
+                <SignOutButton className="w-full justify-start rounded-lg" />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <div className="lg:hidden min-w-0">
             <Logo to="/admin" height={40} className="max-w-[180px]" />
           </div>
           <div className="hidden lg:block min-w-0">
