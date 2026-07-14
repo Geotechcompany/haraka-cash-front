@@ -201,6 +201,13 @@ function DecisionPage() {
     amount: quote.monthly,
   }));
 
+  const cancelAndRetry = () => {
+    setPendingReference(null);
+    setPaymentStatus(null);
+    setPaying(false);
+    toast.message("You can request a new M-Pesa prompt");
+  };
+
   const handleAccept = async () => {
     if (!application?.id) {
       toast.error("Application not found");
@@ -228,6 +235,7 @@ function DecisionPage() {
 
       setPendingReference(result.reference);
       setPaymentStatus(result.status);
+      setPaying(false);
       toast.message(result.message);
     } catch (error) {
       toast.error(getUserFacingError(error, "Failed to initiate M-Pesa payment"));
@@ -276,13 +284,8 @@ function DecisionPage() {
           </div>
           <Button
             variant="outline"
-            className="mt-6 rounded-xl h-11"
-            disabled={paying}
-            onClick={() => {
-              setPendingReference(null);
-              setPaymentStatus(null);
-              setPaying(false);
-            }}
+            className="mt-6 rounded-xl h-11 border-border text-foreground"
+            onClick={cancelAndRetry}
           >
             Cancel and retry
           </Button>
