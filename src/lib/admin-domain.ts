@@ -13,9 +13,15 @@ export function isAdminMetadata(metadata: unknown) {
 }
 
 export function applicationStatusForReview(action: ApplicationReviewAction): ApplicationStatus {
-  if (action === "approve") return "Approved";
+  // Offer ready — fee must be paid before UnderReview / disbursement.
+  if (action === "approve") return "AdditionalActionRequired";
   if (action === "decline") return "Declined";
   return "DocumentsRequired";
+}
+
+/** Statuses where the borrower (or admin prompt) may pay the processing fee. */
+export function statusAllowsProcessingFee(status: ApplicationStatus): boolean {
+  return status === "AdditionalActionRequired" || status === "Approved";
 }
 
 /** Post-fee statuses require a confirmed successful processing-fee payment. */

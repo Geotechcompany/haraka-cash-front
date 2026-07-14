@@ -6,6 +6,7 @@ import {
   applyRepayment,
   buildRepaymentSchedule,
   isAdminMetadata,
+  statusAllowsProcessingFee,
   statusRequiresConfirmedProcessingFee,
 } from "@/lib/admin-domain";
 import { toPlatformSettings } from "@/lib/models/settings";
@@ -30,7 +31,7 @@ test("admin authorization accepts only explicit admin metadata", () => {
 });
 
 test("application review actions resolve to durable statuses", () => {
-  assert.equal(applicationStatusForReview("approve"), "Approved");
+  assert.equal(applicationStatusForReview("approve"), "AdditionalActionRequired");
   assert.equal(applicationStatusForReview("decline"), "Declined");
   assert.equal(applicationStatusForReview("requestDocuments"), "DocumentsRequired");
 });
@@ -39,7 +40,15 @@ test("UnderReview and Disbursing require a confirmed processing fee", () => {
   assert.equal(statusRequiresConfirmedProcessingFee("UnderReview"), true);
   assert.equal(statusRequiresConfirmedProcessingFee("Disbursing"), true);
   assert.equal(statusRequiresConfirmedProcessingFee("Approved"), false);
+  assert.equal(statusRequiresConfirmedProcessingFee("AdditionalActionRequired"), false);
   assert.equal(statusRequiresConfirmedProcessingFee("Pending"), false);
+});
+
+test("processing fee can be paid while awaiting fee action", () => {
+  assert.equal(statusAllowsProcessingFee("AdditionalActionRequired"), true);
+  assert.equal(statusAllowsProcessingFee("Approved"), true);
+  assert.equal(statusAllowsProcessingFee("Pending"), false);
+  assert.equal(statusAllowsProcessingFee("UnderReview"), false);
 });
 
 test("repayment schedule preserves principal, interest, and total", () => {

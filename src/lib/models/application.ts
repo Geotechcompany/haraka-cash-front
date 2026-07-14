@@ -7,13 +7,20 @@ export type ApplicationStatus =
   | "Completed"
   | "Disbursing"
   | "DocumentsRequired"
-  | "UnderReview";
+  | "UnderReview"
+  | "AdditionalActionRequired";
 
 /** User-facing label for application status badges. */
 export function applicationStatusLabel(status: ApplicationStatus | string): string {
   if (status === "UnderReview") return "Under review";
   if (status === "DocumentsRequired") return "Documents required";
+  if (status === "AdditionalActionRequired") return "Action required";
   return status;
+}
+
+/** Offer is ready but processing fee must be paid before CRB review / disbursement. */
+export function statusAwaitsProcessingFee(status: ApplicationStatus | string): boolean {
+  return status === "AdditionalActionRequired" || status === "Approved";
 }
 
 export type ApplicationRecord = {
@@ -83,6 +90,10 @@ export type Application = {
   eligibilityScore: number;
   riskScore: number;
   status: ApplicationStatus;
+  /** True when a successful processing-fee payment exists for this application. */
+  feesPaid: boolean;
+  /** Processing fee amount from the quote (KES), if available. */
+  feeAmount?: number;
   requiredDocuments: string[];
   reviewedBy?: string;
   reviewedAt?: string;
@@ -99,7 +110,16 @@ export function applicationStkPhone(doc: Pick<ApplicationRecord, "mpesaNumber" |
   return "";
 }
 
-export function toApplication(doc: ApplicationRecord): Application {
+export function toApplication(
+  doc: ApplicationRecord,
+  options?: { feesPaid?: boolean },
+): Application {
+  const feesPaid =
+    options?.feesPaid ??
+    (doc.status === "UnderReview" ||
+      doc.status === "Disbursing" ||
+      doc.status === "Completed");
+
   return {
     id: doc.applicationNumber,
     applicant: doc.applicant,
@@ -116,6 +136,8 @@ export function toApplication(doc: ApplicationRecord): Application {
     eligibilityScore: doc.eligibilityScore,
     riskScore: doc.riskScore,
     status: doc.status,
+    feesPaid,
+    feeAmount: doc.quote?.fee,
     requiredDocuments: doc.requiredDocuments ?? [],
     reviewedBy: doc.reviewedBy,
     reviewedAt: doc.reviewedAt

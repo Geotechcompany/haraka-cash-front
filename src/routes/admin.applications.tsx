@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Search, Eye, Check, X, FileUp } from "lucide-react";
+import { Search, Eye, Check, X, FileUp, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { kes } from "@/lib/loan";
-import { applicationStatusLabel } from "@/lib/models/application";
+import { applicationStatusLabel, statusAwaitsProcessingFee } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getAdminApplication, listApplications, reviewApplication } from "@/server/applications";
+import { adminPromptProcessingFeePayment } from "@/server/payments";
 
 export const Route = createFileRoute("/admin/applications")({
   head: () => ({ meta: [{ title: "Applications — Admin" }] }),
@@ -36,6 +37,7 @@ const statusStyles: Record<string, string> = {
   Disbursing: "bg-primary-soft text-primary border-primary/20",
   DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
   UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
+  AdditionalActionRequired: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 function ApplicationsPage() {
@@ -43,6 +45,7 @@ function ApplicationsPage() {
   const router = useRouter();
   const getDetail = useServerFn(getAdminApplication);
   const review = useServerFn(reviewApplication);
+  const promptFee = useServerFn(adminPromptProcessingFeePayment);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof getDetail>>>();
@@ -51,12 +54,17 @@ function ApplicationsPage() {
   const [note, setNote] = useState("");
   const [documents, setDocuments] = useState("National ID, Proof of income");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [promptingFeeId, setPromptingFeeId] = useState<string>();
+
   const rows = applications.filter((a) => {
     const matchesQuery =
       a.applicant.toLowerCase().includes(q.toLowerCase()) ||
       a.id.toLowerCase().includes(q.toLowerCase());
     if (!matchesQuery) return false;
     if (tab === "all") return true;
+    if (tab === "action") {
+      return statusAwaitsProcessingFee(a.status) && !a.feesPaid;
+    }
     if (tab === "pending") {
       return (
         a.status === "Pending" ||
@@ -74,13 +82,34 @@ function ApplicationsPage() {
       toast.success(
         result.status === "Disbursing"
           ? "CRB cleared — disbursement started"
-          : "Application approved",
+          : result.status === "AdditionalActionRequired"
+            ? "Offer accepted — awaiting fee payment"
+            : "Application updated",
       );
       await router.invalidate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not approve application");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const promptFeePayment = async (applicationNumber: string) => {
+    setPromptingFeeId(applicationNumber);
+    try {
+      const result = await promptFee({ data: { applicationNumber } });
+      if (result.status === "success") {
+        toast.success(result.message);
+      } else if (result.status === "failed") {
+        toast.error(result.message);
+      } else {
+        toast.message(result.message);
+      }
+      await router.invalidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not prompt fee payment");
+    } finally {
+      setPromptingFeeId(undefined);
     }
   };
 
@@ -143,12 +172,15 @@ function ApplicationsPage() {
           />
         </div>
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="rounded-xl h-11">
+          <TabsList className="rounded-xl h-auto min-h-11 flex-wrap">
             <TabsTrigger value="all" className="rounded-lg">
               All
             </TabsTrigger>
             <TabsTrigger value="pending" className="rounded-lg">
               Pending
+            </TabsTrigger>
+            <TabsTrigger value="action" className="rounded-lg">
+              Action required
             </TabsTrigger>
             <TabsTrigger value="approved" className="rounded-lg">
               Approved
@@ -171,106 +203,150 @@ function ApplicationsPage() {
                 <th className="text-left font-medium px-6 py-3 hidden lg:table-cell">Income</th>
                 <th className="text-left font-medium px-6 py-3">Risk</th>
                 <th className="text-left font-medium px-6 py-3">Eligibility</th>
+                <th className="text-left font-medium px-6 py-3">Fees paid</th>
                 <th className="text-left font-medium px-6 py-3">Status</th>
                 <th className="text-right font-medium px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {rows.map((a) => (
-                <tr key={a.id} className="hover:bg-muted/30">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full gradient-brand text-white grid place-items-center text-xs font-semibold shrink-0">
-                        {a.applicant[0]}
+              {rows.map((a) => {
+                const needsFee = statusAwaitsProcessingFee(a.status) && !a.feesPaid;
+                const canApprove =
+                  !isSubmitting &&
+                  (a.status === "Pending" ||
+                    a.status === "DocumentsRequired" ||
+                    a.status === "UnderReview");
+
+                return (
+                  <tr key={a.id} className="hover:bg-muted/30">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full gradient-brand text-white grid place-items-center text-xs font-semibold shrink-0">
+                          {a.applicant[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{a.applicant}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {a.id} · {a.phone}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{a.applicant}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {a.id} · {a.phone}
+                    </td>
+                    <td className="px-6 py-4 tabular-nums font-semibold">
+                      {kes(a.amount)}
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {" "}
+                        / {a.months}mo
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
+                      {a.employer}
+                    </td>
+                    <td className="px-6 py-4 hidden lg:table-cell tabular-nums">
+                      {kes(a.monthlyIncome)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <ScoreBar value={a.riskScore} tone="danger" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <ScoreBar value={a.eligibilityScore} tone="success" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                          a.feesPaid
+                            ? "bg-success/15 text-success border-success/30"
+                            : "bg-muted text-muted-foreground border-border",
+                        )}
+                      >
+                        {a.feesPaid ? "Yes" : "No"}
+                      </span>
+                      {!a.feesPaid && a.feeAmount ? (
+                        <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">
+                          {kes(a.feeAmount)}
                         </p>
+                      ) : null}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                          statusStyles[a.status],
+                        )}
+                      >
+                        {applicationStatusLabel(a.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          onClick={() => openDetail(a.id)}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="View"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {needsFee ? (
+                          <Button
+                            disabled={Boolean(promptingFeeId) || isSubmitting}
+                            onClick={() => promptFeePayment(a.id)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-primary"
+                            aria-label="Prompt fee payment"
+                            title="Prompt fee payment to continue"
+                          >
+                            <Smartphone
+                              className={cn(
+                                "h-4 w-4",
+                                promptingFeeId === a.id && "animate-pulse",
+                              )}
+                            />
+                          </Button>
+                        ) : null}
+                        <Button
+                          disabled={!canApprove}
+                          onClick={() => approve(a.id)}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-success"
+                          aria-label="Approve"
+                          title={
+                            needsFee
+                              ? "Fee must be paid before disbursement approval"
+                              : "Approve"
+                          }
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          disabled={isSubmitting || a.status === "Declined"}
+                          onClick={() => openReview(a, "decline")}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          aria-label="Decline"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          disabled={isSubmitting}
+                          onClick={() => openReview(a, "requestDocuments")}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Request docs"
+                        >
+                          <FileUp className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 tabular-nums font-semibold">
-                    {kes(a.amount)}
-                    <span className="text-xs text-muted-foreground font-normal">
-                      {" "}
-                      / {a.months}mo
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
-                    {a.employer}
-                  </td>
-                  <td className="px-6 py-4 hidden lg:table-cell tabular-nums">
-                    {kes(a.monthlyIncome)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <ScoreBar value={a.riskScore} tone="danger" />
-                  </td>
-                  <td className="px-6 py-4">
-                    <ScoreBar value={a.eligibilityScore} tone="success" />
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={cn(
-                        "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
-                        statusStyles[a.status],
-                      )}
-                    >
-                      {applicationStatusLabel(a.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        onClick={() => openDetail(a.id)}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label="View"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        disabled={
-                          isSubmitting ||
-                          a.status === "Approved" ||
-                          a.status === "Disbursing" ||
-                          a.status === "Declined" ||
-                          a.status === "Completed"
-                        }
-                        onClick={() => approve(a.id)}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-success"
-                        aria-label="Approve"
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        disabled={isSubmitting || a.status === "Declined"}
-                        onClick={() => openReview(a, "decline")}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        aria-label="Decline"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        disabled={isSubmitting}
-                        onClick={() => openReview(a, "requestDocuments")}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label="Request docs"
-                      >
-                        <FileUp className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -292,6 +368,10 @@ function ApplicationsPage() {
               <Detail label="Income" value={kes(detail.monthlyIncome)} />
               <Detail label="Employer" value={detail.employer} />
               <Detail label="Purpose" value={detail.purpose} />
+              <Detail label="Fees paid" value={detail.feesPaid ? "Yes" : "No"} />
+              {detail.feeAmount != null ? (
+                <Detail label="Processing fee" value={kes(detail.feeAmount)} />
+              ) : null}
               <Detail label="Status" value={applicationStatusLabel(detail.status)} />
               {detail.reviewNotes && <Detail label="Review notes" value={detail.reviewNotes} />}
             </div>

@@ -16,7 +16,6 @@ const MEANINGFUL_TEXT_KEYS = [
   "existingLoans",
   "rentMortgage",
   "additionalDetails",
-  "idDocumentName",
 ] as const satisfies ReadonlyArray<keyof ApplicationDraftFields>;
 
 /** True when the wizard has real progress worth persisting (not empty first paint). */
@@ -74,7 +73,6 @@ export function normalizeDraftPayload(
       rentMortgage: payload.form.rentMortgage ?? "",
       purpose: payload.form.purpose || "Business",
       additionalDetails: payload.form.additionalDetails ?? "",
-      idDocumentName: payload.form.idDocumentName ?? "",
     },
   };
 }

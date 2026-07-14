@@ -25,6 +25,75 @@ import { isValidKenyanNationalId, isValidKenyanPhone } from "@/lib/kenya-format"
 import { applicationStatusForReview, statusRequiresConfirmedProcessingFee } from "@/lib/admin-domain";
 import { requireAdmin, requireUserId } from "@/server/auth";
 
+/** Application numbers with a confirmed successful processing-fee payment. */
+async function successfulProcessingFeeNumbers(applicationNumbers: string[]) {
+  if (applicationNumbers.length === 0) return new Set<string>();
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  const payments = await db
+    .collection("payments")
+    .find({
+      kind: "processing_fee",
+      status: "success",
+      applicationNumber: { $in: applicationNumbers },
+    })
+    .project({ applicationNumber: 1 })
+    .toArray();
+  return new Set(
+    payments
+      .map((payment) => payment.applicationNumber)
+      .filter((value): value is string => Boolean(value)),
+  );
+}
+
+/**
+ * Approved without a confirmed fee → AdditionalActionRequired.
+ * Approved with a confirmed fee → UnderReview (fee path should already have done this).
+ */
+async function reconcileFeeGateStatuses(
+  docs: ApplicationRecord[],
+  paidNumbers: Set<string>,
+) {
+  const now = new Date();
+  const needsAction = docs.filter(
+    (doc) => doc.status === "Approved" && !paidNumbers.has(doc.applicationNumber),
+  );
+  const needsUnderReview = docs.filter(
+    (doc) => doc.status === "Approved" && paidNumbers.has(doc.applicationNumber),
+  );
+
+  if (needsAction.length === 0 && needsUnderReview.length === 0) return docs;
+
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+
+  if (needsAction.length > 0) {
+    const numbers = needsAction.map((doc) => doc.applicationNumber);
+    await db.collection<ApplicationRecord>("applications").updateMany(
+      { applicationNumber: { $in: numbers }, status: "Approved" },
+      { $set: { status: "AdditionalActionRequired", updatedAt: now } },
+    );
+    for (const doc of needsAction) {
+      doc.status = "AdditionalActionRequired";
+      doc.updatedAt = now;
+    }
+  }
+
+  if (needsUnderReview.length > 0) {
+    const numbers = needsUnderReview.map((doc) => doc.applicationNumber);
+    await db.collection<ApplicationRecord>("applications").updateMany(
+      { applicationNumber: { $in: numbers }, status: "Approved" },
+      { $set: { status: "UnderReview", updatedAt: now } },
+    );
+    for (const doc of needsUnderReview) {
+      doc.status = "UnderReview";
+      doc.updatedAt = now;
+    }
+  }
+
+  return docs;
+}
+
 async function ensureUser(clerkId: string) {
   const { getDb } = await import("@/lib/db");
   const db = await getDb();
@@ -205,7 +274,6 @@ const draftFormSchema = z.object({
   rentMortgage: z.string().max(20).default(""),
   purpose: z.string().max(80).default("Business"),
   additionalDetails: z.string().max(2000).default(""),
-  idDocumentName: z.string().max(260).default(""),
 });
 
 const productTypeSchema = z.enum(["personal_loan", "salary_advance"]);
@@ -240,7 +308,7 @@ export const getApplicationDraft = createServerFn({ method: "GET" }).handler(asy
       form: doc.form,
     },
     {
-      maxStep: 4,
+      maxStep: 3,
       minAmount: lendingSettings.minLoanAmount,
       maxAmount: lendingSettings.maxLoanAmount,
     },
@@ -259,7 +327,7 @@ export const saveApplicationDraft = createServerFn({ method: "POST" })
     const { readPlatformSettings } = await import("@/server/settings");
     const lendingSettings = await readPlatformSettings();
     const payload = normalizeDraftPayload(data, {
-      maxStep: 4,
+      maxStep: 3,
       minAmount: lendingSettings.minLoanAmount,
       maxAmount: lendingSettings.maxLoanAmount,
     });
@@ -307,7 +375,7 @@ export const listApplications = createServerFn({ method: "GET" })
 
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
-    const filter = scope === "all" ? {} : { clerkUserId: (await auth()).userId ?? "__none__" };
+    const filter = scope === "mine" ? { clerkUserId: (await auth()).userId ?? "__none__" } : {};
 
     const docs = await db
       .collection<ApplicationRecord>("applications")
@@ -315,7 +383,21 @@ export const listApplications = createServerFn({ method: "GET" })
       .sort({ createdAt: -1 })
       .toArray();
 
-    return docs.map(toApplication);
+    const paidNumbers = await successfulProcessingFeeNumbers(
+      docs.map((doc) => doc.applicationNumber),
+    );
+
+    await reconcileFeeGateStatuses(docs, paidNumbers);
+
+    return docs.map((doc) =>
+      toApplication(doc, {
+        feesPaid:
+          paidNumbers.has(doc.applicationNumber) ||
+          doc.status === "UnderReview" ||
+          doc.status === "Disbursing" ||
+          doc.status === "Completed",
+      }),
+    );
   });
 
 export const getApplication = createServerFn({ method: "GET" })
@@ -329,7 +411,17 @@ export const getApplication = createServerFn({ method: "GET" })
       .findOne({ applicationNumber, clerkUserId });
 
     if (!doc) return null;
-    return { ...toApplication(doc), quote: doc.quote ?? null };
+    const paidNumbers = await successfulProcessingFeeNumbers([applicationNumber]);
+    return {
+      ...toApplication(doc, {
+        feesPaid:
+          paidNumbers.has(applicationNumber) ||
+          doc.status === "UnderReview" ||
+          doc.status === "Disbursing" ||
+          doc.status === "Completed",
+      }),
+      quote: doc.quote ?? null,
+    };
   });
 
 export const getAdminApplication = createServerFn({ method: "GET" })
@@ -342,7 +434,17 @@ export const getAdminApplication = createServerFn({ method: "GET" })
       .collection<ApplicationRecord>("applications")
       .findOne({ applicationNumber });
     if (!doc) return null;
-    return { ...toApplication(doc), quote: doc.quote ?? null };
+    const paidNumbers = await successfulProcessingFeeNumbers([applicationNumber]);
+    return {
+      ...toApplication(doc, {
+        feesPaid:
+          paidNumbers.has(applicationNumber) ||
+          doc.status === "UnderReview" ||
+          doc.status === "Disbursing" ||
+          doc.status === "Completed",
+      }),
+      quote: doc.quote ?? null,
+    };
   });
 
 const kenyanMobile = z
@@ -476,7 +578,7 @@ export const createApplication = createServerFn({ method: "POST" })
       createdAt: now,
     });
 
-    return toApplication(doc);
+    return toApplication(doc, { feesPaid: false });
   });
 
 export const runAssessment = createServerFn({ method: "POST" })
@@ -528,6 +630,10 @@ export const runAssessment = createServerFn({ method: "POST" })
     const { approved, status, eligibilityScore, steps, notes, decisionHint, eligible, approvedAmount, isPartialOffer } =
       clamped;
 
+    // Offer ready requires fee payment before CRB / final approval.
+    const persistedStatus: ApplicationStatus =
+      status === "Approved" ? "AdditionalActionRequired" : status;
+
     const offerQuote = buildLoanQuote(approvedAmount, doc.months, {
       monthlyInterestRatePercent: lendingSettings.monthlyInterestRate,
       minProcessingFee: lendingSettings.minProcessingFee,
@@ -538,7 +644,7 @@ export const runAssessment = createServerFn({ method: "POST" })
       { applicationNumber },
       {
         $set: {
-          status,
+          status: persistedStatus,
           eligibilityScore,
           riskScore: 100 - eligibilityScore,
           approvedAmount,
@@ -578,7 +684,7 @@ export const runAssessment = createServerFn({ method: "POST" })
 
     return {
       applicationNumber,
-      status,
+      status: persistedStatus,
       approved: true,
       approvedAmount,
       requestedAmount: doc.amount,
@@ -603,6 +709,7 @@ const updateStatusInput = z.object({
     "Disbursing",
     "DocumentsRequired",
     "UnderReview",
+    "AdditionalActionRequired",
   ]),
 });
 
@@ -625,6 +732,15 @@ export const reviewApplication = createServerFn({ method: "POST" })
     if (!application) throw new Error("Application not found");
 
     const now = new Date();
+
+    // Final approval (disbursement) is only allowed after fee → UnderReview.
+    if (data.action === "approve" && application.status !== "UnderReview") {
+      if (application.status === "AdditionalActionRequired" || application.status === "Approved") {
+        throw new Error(
+          "Processing fee must be paid before this application can be approved for disbursement.",
+        );
+      }
+    }
 
     // Fee paid + CRB queue: admin approve starts disbursement (does not re-open offer).
     if (data.action === "approve" && application.status === "UnderReview") {
@@ -679,10 +795,10 @@ export const reviewApplication = createServerFn({ method: "POST" })
 
     if (application.clerkUserId) {
       const notification =
-        status === "Approved"
+        status === "AdditionalActionRequired"
           ? {
-              title: "Loan application approved",
-              body: `Your application ${data.applicationNumber} has been approved. Pay the processing fee to continue.`,
+              title: "Loan offer ready",
+              body: `Your application ${data.applicationNumber} was accepted. Pay the processing fee to continue to under review.`,
               type: "success",
             }
           : status === "Declined"
@@ -710,8 +826,8 @@ export const reviewApplication = createServerFn({ method: "POST" })
     await logAuditEvent({
       actor: adminId,
       action:
-        status === "Approved"
-          ? "Approved application"
+        status === "AdditionalActionRequired"
+          ? "Accepted offer — awaiting processing fee"
           : status === "Declined"
             ? "Declined application"
             : "Requested application documents",

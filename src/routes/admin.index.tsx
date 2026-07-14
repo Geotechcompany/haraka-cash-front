@@ -41,6 +41,7 @@ const statusStyles: Record<string, string> = {
   Disbursing: "bg-primary-soft text-primary border-primary/20",
   UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
   DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
+  AdditionalActionRequired: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 function AdminDashboard() {

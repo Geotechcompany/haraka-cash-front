@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { kes } from "@/lib/loan";
 import { productTypeLabel } from "@/lib/lending-products";
+import { statusAwaitsProcessingFee } from "@/lib/models/application";
 import type { PaymentStatus } from "@/lib/models/payment";
 import { toast } from "sonner";
 import { getApplication } from "@/server/applications";
@@ -136,7 +137,7 @@ function DecisionPage() {
   const requestedAmount = application.amount;
   const offeredAmount = application.approvedAmount ?? quote.amount;
   const isPartialOffer =
-    application.status === "Approved" &&
+    statusAwaitsProcessingFee(application.status) &&
     Number.isFinite(offeredAmount) &&
     Number.isFinite(requestedAmount) &&
     offeredAmount > 0 &&
@@ -190,7 +191,7 @@ function DecisionPage() {
   }
 
   const hasOffer =
-    application.status === "Approved" ||
+    statusAwaitsProcessingFee(application.status) ||
     ((application.approvedAmount ?? 0) > 0 && Boolean(application.quote));
 
   const schedule = Array.from({ length: quote.months }).map((_, i) => ({

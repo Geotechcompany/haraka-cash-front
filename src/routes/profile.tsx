@@ -246,9 +246,6 @@ function ProfilePage() {
             <TabsTrigger value="banking" className="rounded-lg">
               Banking
             </TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-lg">
-              Documents
-            </TabsTrigger>
             <TabsTrigger value="security" className="rounded-lg">
               Security
             </TabsTrigger>
@@ -388,21 +385,6 @@ function ProfilePage() {
               />
             </div>
             <SaveBar saving={saving} onSave={handleSave} />
-          </TabsContent>
-
-          <TabsContent value="documents" className="mt-4">
-            <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-soft">
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary">
-                <Shield className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">National ID</p>
-                <p className="text-xs text-muted-foreground">Not uploaded</p>
-              </div>
-              <Button variant="ghost" size="sm" className="rounded-lg" type="button" disabled>
-                Upload
-              </Button>
-            </div>
           </TabsContent>
 
           <TabsContent value="security" className="mt-4">

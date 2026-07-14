@@ -25,6 +25,7 @@ const statusStyles: Record<string, string> = {
   Disbursing: "bg-primary-soft text-primary border-primary/20",
   UnderReview: "bg-warning/15 text-warning-foreground border-warning/30",
   DocumentsRequired: "bg-primary-soft text-primary border-primary/20",
+  AdditionalActionRequired: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 const springEnter = { type: "spring" as const, bounce: 0, duration: 0.35 };
@@ -36,6 +37,7 @@ function LoansPage() {
   const activeLoan = applications.find(
     (a) =>
       a.status === "Approved" ||
+      a.status === "AdditionalActionRequired" ||
       a.status === "Disbursing" ||
       a.status === "UnderReview",
   );
@@ -51,7 +53,8 @@ function LoansPage() {
       return (
         a.status === "Pending" ||
         a.status === "UnderReview" ||
-        a.status === "DocumentsRequired"
+        a.status === "DocumentsRequired" ||
+        a.status === "AdditionalActionRequired"
       );
     }
     return a.status.toLowerCase() === tab;
@@ -96,7 +99,9 @@ function LoansPage() {
               {
                 l: "Fee paid",
                 done:
-                  activeLoan.status === "UnderReview" || activeLoan.status === "Disbursing",
+                  activeLoan.feesPaid ||
+                  activeLoan.status === "UnderReview" ||
+                  activeLoan.status === "Disbursing",
                 icon: CheckCircle2,
               },
               {

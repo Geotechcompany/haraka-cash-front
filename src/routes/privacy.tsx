@@ -38,8 +38,8 @@ function PrivacyPage() {
       <LegalSection title="2. Data we collect">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
-            <span className="font-medium text-foreground">Identity:</span> name, national ID or other
-            KYC documents, date of birth, and photos or scans you upload for verification.
+            <span className="font-medium text-foreground">Identity:</span> name, national ID number,
+            and date of birth.
           </li>
           <li>
             <span className="font-medium text-foreground">Contact &amp; M-Pesa:</span> phone number,

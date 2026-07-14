@@ -18,7 +18,6 @@ const emptyForm = {
   rentMortgage: "",
   purpose: "Business",
   additionalDetails: "",
-  idDocumentName: "",
 };
 
 describe("isDraftWorthSaving", () => {
@@ -91,9 +90,9 @@ describe("isDraftWorthSaving", () => {
 
 describe("clampDraftStep", () => {
   it("clamps to range", () => {
-    assert.equal(clampDraftStep(-1, 4), 0);
-    assert.equal(clampDraftStep(9, 4), 4);
-    assert.equal(clampDraftStep(2.7, 4), 2);
+    assert.equal(clampDraftStep(-1, 3), 0);
+    assert.equal(clampDraftStep(9, 3), 3);
+    assert.equal(clampDraftStep(2.7, 3), 2);
   });
 });
 
@@ -107,9 +106,9 @@ describe("normalizeDraftPayload", () => {
         productType: "salary_advance",
         form: { ...emptyForm, employmentStatus: "", purpose: "" },
       },
-      { maxStep: 4, minAmount: 5_000, maxAmount: 50_000 },
+      { maxStep: 3, minAmount: 5_000, maxAmount: 50_000 },
     );
-    assert.equal(normalized.step, 4);
+    assert.equal(normalized.step, 3);
     assert.equal(normalized.amount, 5_000);
     assert.equal(normalized.months, 1);
     assert.equal(normalized.productType, "salary_advance");

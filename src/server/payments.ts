@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { applicationStkPhone, type ApplicationRecord } from "@/lib/models/application";
+import { statusAllowsProcessingFee } from "@/lib/admin-domain";
 import {
   paymentReference,
   toPayment,
@@ -91,70 +92,144 @@ export const initiateProcessingFeePayment = createServerFn({ method: "POST" })
     });
 
     if (!application) throw new Error("Application not found");
-    if (application.status !== "Approved") {
-      throw new Error("Application must be approved before paying the processing fee");
-    }
-
-    const fee = application.quote?.fee;
-    if (!fee || fee <= 0) throw new Error("Processing fee is not available for this application");
-
-    const stkPhone = applicationStkPhone(application);
-    if (!stkPhone) {
+    if (!statusAllowsProcessingFee(application.status)) {
       throw new Error(
-        "No M-Pesa number on this application. Re-apply with your M-Pesa number or contact support.",
+        "This application is not awaiting a processing fee. Pay only when an offer requires fee payment.",
       );
     }
 
-    const reference = paymentReference("FEE");
-    const { normalizeKenyanPhone, initiateProcessingFeeStkPush } =
-      await import("@/lib/smply-pay.server");
-    const phone = normalizeKenyanPhone(stkPhone);
-    const now = new Date();
+    return startProcessingFeeStk({ application, clerkUserId });
+  });
 
-    const provider = await initiateProcessingFeeStkPush({
-      phone,
-      amount: fee,
-      reference,
-      description: `HarakaCash processing fee for ${application.applicationNumber}`,
+/** Admin: send M-Pesa STK to the applicant so fee payment can proceed to under review. */
+export const adminPromptProcessingFeePayment = createServerFn({ method: "POST" })
+  .validator((data: unknown) => processingFeeInput.parse(data))
+  .handler(async ({ data }) => {
+    const adminId = await requireAdmin();
+    const { getDb } = await import("@/lib/db");
+    const db = await getDb();
+    const application = await db.collection<ApplicationRecord>("applications").findOne({
+      applicationNumber: data.applicationNumber,
     });
 
-    // Never advance on STK-sent alone — webhook / confirmed status owns UnderReview.
-    const paymentStatus: PaymentStatus =
-      provider.status === "failed" ? "failed" : "pending";
+    if (!application) throw new Error("Application not found");
+    if (!statusAllowsProcessingFee(application.status)) {
+      throw new Error(
+        "Fee payment can only be prompted when the application is awaiting the processing fee.",
+      );
+    }
 
-    const payment: PaymentRecord = {
-      reference,
-      kind: "processing_fee",
-      amount: fee,
-      phone,
-      status: paymentStatus,
-      provider: "smply_pay",
-      providerRef: provider.providerRef,
-      clerkUserId,
-      applicationNumber: application.applicationNumber,
-      description: `Processing fee for ${application.applicationNumber}`,
-      providerResponse: provider.raw,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await db.collection<PaymentRecord>("payments").insertOne(payment);
-
-    if (paymentStatus === "failed") {
+    const existing = await findSuccessfulProcessingFee(data.applicationNumber);
+    if (existing) {
+      await markApplicationUnderReview(data.applicationNumber);
       return {
-        reference,
-        status: paymentStatus,
-        message: provider.message ?? "STK push failed. You can try again.",
+        reference: existing.reference,
+        status: "success" as const,
+        message: "Fee already paid — application moved to under review.",
       };
     }
 
+    const result = await startProcessingFeeStk({
+      application,
+      clerkUserId: application.clerkUserId,
+    });
+
+    const { logAuditEvent } = await import("@/server/internal/audit-events");
+    await logAuditEvent({
+      actor: adminId,
+      action: `Prompted processing fee STK for ${data.applicationNumber}`,
+      target: result.reference,
+    });
+
+    if (application.clerkUserId) {
+      await db.collection("notifications").insertOne({
+        clerkUserId: application.clerkUserId,
+        title: "Pay processing fee",
+        body: `Enter your M-Pesa PIN to pay the processing fee for ${data.applicationNumber}. After payment, your application moves to under review.`,
+        type: "info",
+        unread: true,
+        createdAt: new Date(),
+      });
+    }
+
+    return result;
+  });
+
+async function startProcessingFeeStk({
+  application,
+  clerkUserId,
+}: {
+  application: ApplicationRecord;
+  clerkUserId?: string;
+}) {
+  const fee = application.quote?.fee;
+  if (!fee || fee <= 0) throw new Error("Processing fee is not available for this application");
+
+  const stkPhone = applicationStkPhone(application);
+  if (!stkPhone) {
+    throw new Error(
+      "No M-Pesa number on this application. Re-apply with your M-Pesa number or contact support.",
+    );
+  }
+
+  const reference = paymentReference("FEE");
+  const { normalizeKenyanPhone, initiateProcessingFeeStkPush } =
+    await import("@/lib/smply-pay.server");
+  const phone = normalizeKenyanPhone(stkPhone);
+  const now = new Date();
+
+  const provider = await initiateProcessingFeeStkPush({
+    phone,
+    amount: fee,
+    reference,
+    description: `HarakaCash processing fee for ${application.applicationNumber}`,
+  });
+
+  // Never advance on STK-sent alone — webhook / confirmed status owns UnderReview.
+  const paymentStatus: PaymentStatus = provider.status === "failed" ? "failed" : "pending";
+
+  const payment: PaymentRecord = {
+    reference,
+    kind: "processing_fee",
+    amount: fee,
+    phone,
+    status: paymentStatus,
+    provider: "smply_pay",
+    providerRef: provider.providerRef,
+    clerkUserId,
+    applicationNumber: application.applicationNumber,
+    description: `Processing fee for ${application.applicationNumber}`,
+    providerResponse: provider.raw,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+  await db.collection<PaymentRecord>("payments").insertOne(payment);
+
+  // Ensure legacy Approved records awaiting fee are flagged for action tracking.
+  if (application.status === "Approved") {
+    await db.collection<ApplicationRecord>("applications").updateOne(
+      { applicationNumber: application.applicationNumber, status: "Approved" },
+      { $set: { status: "AdditionalActionRequired", updatedAt: now } },
+    );
+  }
+
+  if (paymentStatus === "failed") {
     return {
       reference,
       status: paymentStatus,
-      message:
-        "Enter M-Pesa PIN on your phone. We'll continue when the fee is received.",
+      message: provider.message ?? "STK push failed. You can try again.",
     };
-  });
+  }
+
+  return {
+    reference,
+    status: paymentStatus,
+    message: "Enter M-Pesa PIN on your phone. We'll continue when the fee is received.",
+  };
+}
 
 const walletTransferInput = z.object({
   phone: z.string().min(9),

@@ -16,7 +16,6 @@ export type ApplicationDraftFields = {
   rentMortgage: string;
   purpose: string;
   additionalDetails: string;
-  idDocumentName: string;
 };
 
 export type ApplicationDraftPayload = {

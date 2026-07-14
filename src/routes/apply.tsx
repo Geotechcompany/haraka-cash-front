@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowRight, Upload, Loader2, CheckCircle2, Wallet, Banknote } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Wallet, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
@@ -89,7 +89,6 @@ const steps = [
   { key: "employment", title: "Employment", desc: "Where you work" },
   { key: "financial", title: "Financial", desc: "Income & expenses" },
   { key: "request", title: "Loan Request", desc: "Amount & purpose" },
-  { key: "documents", title: "Documents", desc: "Upload verification" },
 ] as const;
 
 type FormState = {
@@ -107,7 +106,6 @@ type FormState = {
   rentMortgage: string;
   purpose: string;
   additionalDetails: string;
-  idDocumentName: string;
 };
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
@@ -164,7 +162,6 @@ function ApplyPage() {
     rentMortgage: draft?.form.rentMortgage ?? "",
     purpose: draft?.form.purpose || "Business",
     additionalDetails: draft?.form.additionalDetails ?? "",
-    idDocumentName: draft?.form.idDocumentName ?? "",
   }));
 
   const latestDraftRef = useRef({
@@ -882,43 +879,6 @@ function ApplyPage() {
                     </div>
                   </div>
                 )}
-
-                {step === 4 && (
-                  <div className="grid gap-3">
-                    <label
-                      className={cn(
-                        "card-soft p-5 text-left hover:border-primary hover:shadow-elevated transition-all group cursor-pointer block",
-                        showError("idDocumentName") && "border-destructive",
-                      )}
-                    >
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        className="sr-only"
-                        required
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          setField("idDocumentName", file?.name ?? "");
-                        }}
-                      />
-                      <div className="h-10 w-10 rounded-xl bg-primary-soft text-primary grid place-items-center group-hover:scale-105 transition-transform">
-                        <Upload className="h-5 w-5" />
-                      </div>
-                      <p className="mt-3 font-semibold">
-                        National ID <span className="text-destructive">*</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">Front & back photo</p>
-                      <p className="mt-2 text-xs text-primary font-medium">
-                        {form.idDocumentName
-                          ? `Selected: ${form.idDocumentName}`
-                          : "Click to upload"}
-                      </p>
-                      {showError("idDocumentName") && (
-                        <p className="mt-2 text-xs text-destructive">{showError("idDocumentName")}</p>
-                      )}
-                    </label>
-                  </div>
-                )}
               </motion.div>
             </AnimatePresence>
 
@@ -1021,7 +981,7 @@ function requiredNonNegative(value: string, label: string) {
 }
 
 function validateAllSteps(form: FormState): FieldErrors {
-  return [0, 1, 2, 3, 4].reduce<FieldErrors>(
+  return [0, 1, 2, 3].reduce<FieldErrors>(
     (acc, s) => ({ ...acc, ...validateStep(s, form) }),
     {},
   );
@@ -1076,12 +1036,6 @@ function validateStep(step: number, form: FormState): FieldErrors {
 
   if (step === 3) {
     if (!form.purpose.trim()) errors.purpose = "Loan purpose is required";
-  }
-
-  if (step === 4) {
-    if (!form.idDocumentName.trim()) {
-      errors.idDocumentName = "Upload your National ID to continue";
-    }
   }
 
   return errors;
