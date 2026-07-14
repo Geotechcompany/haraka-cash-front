@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +40,7 @@ function AdminUsersPage() {
       toast.success(`User ${status.toLowerCase()}`);
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update user");
+      toast.error(getUserFacingError(error, "Could not update user"));
     } finally {
       setUpdatingId(undefined);
     }

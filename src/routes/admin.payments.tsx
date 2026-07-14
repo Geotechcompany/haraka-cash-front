@@ -10,6 +10,7 @@ import { ArrowUpFromLine, CreditCard, TrendingUp, Wallet } from "lucide-react";
 import { kes } from "@/lib/loan";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import {
   getWalletBalance,
   initiateAdminDeposit,
@@ -69,9 +70,6 @@ function AdminPaymentsPage() {
     .filter((p) => p.kind === "withdrawal" && p.status === "success")
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const stripServerPrefix = (raw: string) =>
-    raw.replace(/^Server Error\s*/i, "").trim() || raw;
-
   const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDepositing(true);
@@ -87,8 +85,7 @@ function AdminPaymentsPage() {
       });
       window.location.reload();
     } catch (error) {
-      const raw = error instanceof Error ? error.message : "Deposit failed";
-      toast.error(stripServerPrefix(raw));
+      toast.error(getUserFacingError(error, "Deposit failed"));
     } finally {
       setDepositing(false);
     }
@@ -113,8 +110,7 @@ function AdminPaymentsPage() {
       }
       window.location.reload();
     } catch (error) {
-      const raw = error instanceof Error ? error.message : "Withdrawal failed";
-      toast.error(stripServerPrefix(raw));
+      toast.error(getUserFacingError(error, "Withdrawal failed"));
     } finally {
       setWithdrawing(false);
     }
@@ -133,8 +129,7 @@ function AdminPaymentsPage() {
       }
       toast.message(result.reason);
     } catch (error) {
-      const raw = error instanceof Error ? error.message : "Could not refresh payment status";
-      toast.error(stripServerPrefix(raw));
+      toast.error(getUserFacingError(error, "Could not refresh payment status"));
     } finally {
       setReconciling(false);
     }

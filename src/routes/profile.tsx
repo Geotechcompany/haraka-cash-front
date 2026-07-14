@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Upload, Shield, Bell, KeyRound, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -74,10 +75,6 @@ function initials(name: string) {
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "HC"
   );
-}
-
-function stripServerPrefix(raw: string) {
-  return raw.replace(/^.*?Server Fn Error:\s*/i, "").trim() || raw;
 }
 
 function validateForm(form: ProfileFormState): Partial<Record<keyof ProfileFormState, string>> {
@@ -184,8 +181,7 @@ function ProfilePage() {
       toast.success("Profile saved");
       await router.invalidate();
     } catch (error) {
-      const raw = error instanceof Error ? error.message : "Could not save profile";
-      toast.error(stripServerPrefix(raw));
+      toast.error(getUserFacingError(error, "Could not save profile"));
     } finally {
       setSaving(false);
     }

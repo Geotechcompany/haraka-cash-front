@@ -11,6 +11,7 @@ import { productTypeLabel } from "@/lib/lending-products";
 import { statusAwaitsProcessingFee } from "@/lib/models/application";
 import type { PaymentStatus } from "@/lib/models/payment";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { getApplication } from "@/server/applications";
 import { getPaymentStatus, initiateProcessingFeePayment } from "@/server/payments";
 
@@ -229,7 +230,7 @@ function DecisionPage() {
       setPaymentStatus(result.status);
       toast.message(result.message);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to initiate M-Pesa payment");
+      toast.error(getUserFacingError(error, "Failed to initiate M-Pesa payment"));
       setPaying(false);
     }
   };

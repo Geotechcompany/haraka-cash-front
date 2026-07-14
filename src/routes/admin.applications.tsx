@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Search, Eye, Check, X, FileUp, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,7 @@ function ApplicationsPage() {
       );
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not approve application");
+      toast.error(getUserFacingError(error, "Could not approve application"));
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +113,7 @@ function ApplicationsPage() {
       }
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not prompt fee payment");
+      toast.error(getUserFacingError(error, "Could not prompt fee payment"));
     } finally {
       setPromptingFeeId(undefined);
     }
@@ -122,7 +123,7 @@ function ApplicationsPage() {
     try {
       setDetail(await getDetail({ data: applicationNumber }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load application");
+      toast.error(getUserFacingError(error, "Could not load application"));
     }
   };
 
@@ -158,7 +159,7 @@ function ApplicationsPage() {
       setReviewAction(undefined);
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not review application");
+      toast.error(getUserFacingError(error, "Could not review application"));
     } finally {
       setIsSubmitting(false);
     }

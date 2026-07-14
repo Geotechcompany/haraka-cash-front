@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Wallet, Banknote } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
@@ -540,7 +541,7 @@ function ApplyWizard({
       });
       navigate({ to: "/assessment", search: { applicationId: application.id } });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not submit application");
+      toast.error(getUserFacingError(error, "Could not submit application"));
     } finally {
       setSubmitting(false);
     }
@@ -778,6 +779,7 @@ function ApplyWizard({
                       name="yearsAtEmployer"
                       type="number"
                       min={0}
+                      max={60}
                       step={1}
                       placeholder="0"
                       value={form.yearsAtEmployer}
@@ -1063,6 +1065,8 @@ function validateStep(step: number, form: FormState): FieldErrors {
       const years = Number(form.yearsAtEmployer);
       if (!Number.isFinite(years) || years < 0) {
         errors.yearsAtEmployer = "Enter a valid number of years";
+      } else if (years > 60) {
+        errors.yearsAtEmployer = "Years at employer must be 60 or less";
       }
     }
   }

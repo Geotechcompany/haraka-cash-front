@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -86,7 +87,7 @@ function AdminSettingsPage() {
       setNvidiaApiKeyInput(updated.nvidiaApiKeyMasked || "");
       toast.success("Platform settings saved");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save settings");
+      toast.error(getUserFacingError(error, "Could not save settings"));
     } finally {
       setIsSaving(false);
     }
