@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
@@ -22,6 +22,12 @@ import { isDraftWorthSaving } from "@/lib/application-draft";
 import { computeAffordabilityCeiling } from "@/lib/assessment-policy";
 import { buildLoanQuote, kes } from "@/lib/loan";
 import { kenyanNationalIdError, kenyanPhoneError } from "@/lib/kenya-format";
+import {
+  applicationStatusLabel,
+  blockingApplicationDestination,
+  findBlockingApplication,
+  type Application,
+} from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import {
   clampRepaymentMonths,
@@ -38,6 +44,7 @@ import {
   createApplication,
   getApplicationDraft,
   getCurrentUser,
+  listApplications,
   saveApplicationDraft,
 } from "@/server/applications";
 import { generateLoanQuote, type GeneratedLoanQuote } from "@/server/quote";
@@ -55,13 +62,15 @@ export const Route = createFileRoute("/apply")({
     type: search?.type,
   }),
   loader: async ({ deps }) => {
-    const [user, lendingPolicy, draft] = await Promise.all([
+    const [user, lendingPolicy, draft, applications] = await Promise.all([
       getCurrentUser(),
       getPublicLendingPolicy(),
       getApplicationDraft(),
+      listApplications({ data: { scope: "mine" } }),
     ]);
     const preselectedProduct = parseProductTypeFromSearch(deps);
-    return { user, lendingPolicy, draft, preselectedProduct };
+    const blockingApplication = findBlockingApplication(applications) ?? null;
+    return { user, lendingPolicy, draft, preselectedProduct, blockingApplication };
   },
   head: ({ loaderData }) => {
     const isSalaryAdvance = loaderData?.preselectedProduct === "salary_advance";
@@ -110,8 +119,47 @@ type FormState = {
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
+function ApplyBlocked({ application }: { application: Application }) {
+  const destination = blockingApplicationDestination(application);
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-lg py-8 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">Application in progress</h1>
+        <p className="mt-3 text-muted-foreground">
+          You already have application{" "}
+          <span className="font-medium text-foreground">{application.id}</span> (
+          {applicationStatusLabel(application.status)}). Finish it before starting a new one.
+        </p>
+        <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Button asChild className="rounded-xl gradient-brand text-white">
+            <Link {...destination}>View application</Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/loans">My loans</Link>
+          </Button>
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
 function ApplyPage() {
-  const { user, lendingPolicy, draft } = Route.useLoaderData();
+  const { blockingApplication, ...wizardData } = Route.useLoaderData();
+  if (blockingApplication) {
+    return <ApplyBlocked application={blockingApplication} />;
+  }
+  return <ApplyWizard {...wizardData} />;
+}
+
+function ApplyWizard({
+  user,
+  lendingPolicy,
+  draft,
+}: {
+  user: Awaited<ReturnType<typeof getCurrentUser>>;
+  lendingPolicy: Awaited<ReturnType<typeof getPublicLendingPolicy>>;
+  draft: Awaited<ReturnType<typeof getApplicationDraft>>;
+}) {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const createApplicationFn = useServerFn(createApplication);
@@ -491,6 +539,8 @@ function ApplyPage() {
         },
       });
       navigate({ to: "/assessment", search: { applicationId: application.id } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not submit application");
     } finally {
       setSubmitting(false);
     }

@@ -10,6 +10,20 @@ export type ApplicationStatus =
   | "UnderReview"
   | "AdditionalActionRequired";
 
+/** Statuses that prevent starting another application until finalized. */
+export const APPLICATION_STATUSES_BLOCKING_NEW_APPLY: ApplicationStatus[] = [
+  "Pending",
+  "DocumentsRequired",
+  "Approved",
+  "AdditionalActionRequired",
+  "UnderReview",
+  "Disbursing",
+];
+
+export function applicationBlocksNewApply(status: ApplicationStatus | string): boolean {
+  return (APPLICATION_STATUSES_BLOCKING_NEW_APPLY as string[]).includes(status);
+}
+
 /** User-facing label for application status badges. */
 export function applicationStatusLabel(status: ApplicationStatus | string): string {
   if (status === "UnderReview") return "Under review";
@@ -119,6 +133,19 @@ export function isPendingOfferPipeline(status: ApplicationStatus | string): bool
     status === "AdditionalActionRequired" ||
     status === "UnderReview"
   );
+}
+
+export function findBlockingApplication(applications: Application[]): Application | undefined {
+  return applications.find((app) => applicationBlocksNewApply(app.status));
+}
+
+export function blockingApplicationDestination(
+  app: Pick<Application, "status" | "feesPaid" | "id">,
+): { to: "/decision"; search: { applicationId: string } } | { to: "/loans" } {
+  if (applicationNeedsProcessingFee(app) || isPendingOfferPipeline(app.status)) {
+    return { to: "/decision", search: { applicationId: app.id } };
+  }
+  return { to: "/loans" };
 }
 
 export function pendingOfferHeadline(app: Pick<Application, "status" | "feesPaid">): string {

@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Search, Plus, CheckCircle2, Clock, XCircle, ArrowRight, Smartphone } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,8 @@ import { kes } from "@/lib/loan";
 import {
   applicationNeedsProcessingFee,
   applicationStatusLabel,
+  blockingApplicationDestination,
+  findBlockingApplication,
   isActiveDisbursedLoan,
   isPendingOfferPipeline,
   pendingOfferHeadline,
@@ -97,12 +100,23 @@ function PayProcessingFeeButton({
 
 function LoansPage() {
   const applications = Route.useLoaderData();
+  const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
+  const blockingApplication = findBlockingApplication(applications);
   const activeLoan = applications.find((a) => isActiveDisbursedLoan(a.status));
   const pendingOffer = applications.find((a) => isPendingOfferPipeline(a.status));
   const featuredApp = activeLoan ?? pendingOffer;
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
+
+  const goApply = () => {
+    if (blockingApplication) {
+      toast.message("Finish your current application first");
+      navigate(blockingApplicationDestination(blockingApplication));
+      return;
+    }
+    navigate({ to: "/apply" });
+  };
   const filtered = applications.filter((a) => {
     const matchesQuery =
       a.id.toLowerCase().includes(q.toLowerCase()) ||
@@ -127,10 +141,11 @@ function LoansPage() {
           <h1 className="font-display text-3xl font-bold tracking-tight">My loans</h1>
           <p className="mt-1 text-muted-foreground">Applications, offers, and repayments.</p>
         </div>
-        <Button asChild className="h-11 rounded-xl gradient-brand text-white shadow-soft">
-          <Link to="/apply">
-            <Plus className="mr-1 h-4 w-4" /> New loan
-          </Link>
+        <Button
+          className="h-11 rounded-xl gradient-brand text-white shadow-soft"
+          onClick={goApply}
+        >
+          <Plus className="mr-1 h-4 w-4" /> New loan
         </Button>
       </div>
 

@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import {
+  APPLICATION_STATUSES_BLOCKING_NEW_APPLY,
   nextApplicationNumber,
   toApplication,
   type ApplicationRecord,
@@ -509,6 +510,18 @@ export const createApplication = createServerFn({ method: "POST" })
     }
     const { getDb } = await import("@/lib/db");
     const db = await getDb();
+    const openApplication = await db.collection<ApplicationRecord>("applications").findOne(
+      {
+        clerkUserId,
+        status: { $in: APPLICATION_STATUSES_BLOCKING_NEW_APPLY },
+      },
+      { sort: { createdAt: -1 } },
+    );
+    if (openApplication) {
+      throw new Error(
+        `You already have an open application (${openApplication.applicationNumber}). Finish it before starting a new one.`,
+      );
+    }
     const now = new Date();
     const count = await db.collection("applications").countDocuments();
     const applicationNumber = nextApplicationNumber(count);

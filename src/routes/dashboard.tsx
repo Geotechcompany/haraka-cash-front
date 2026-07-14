@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import {
   TrendingUp,
@@ -21,6 +21,7 @@ import {
   Bar,
   CartesianGrid,
 } from "recharts";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -30,6 +31,8 @@ import { productTypeLabel } from "@/lib/lending-products";
 import {
   applicationNeedsProcessingFee,
   applicationStatusLabel,
+  blockingApplicationDestination,
+  findBlockingApplication,
   isActiveDisbursedLoan,
   isPendingOfferPipeline,
   pendingOfferHeadline,
@@ -78,7 +81,9 @@ function greetingForHour(hour: number) {
 
 function Dashboard() {
   const { user, applications, notifications, loanHistory, stats, referrals } = Route.useLoaderData();
+  const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
+  const blockingApplication = findBlockingApplication(applications);
   const recent = applications.slice(0, 5);
   const activeLoan = applications.find((a) => isActiveDisbursedLoan(a.status));
   const pendingOffer = applications.find((a) => isPendingOfferPipeline(a.status));
@@ -87,6 +92,15 @@ function Dashboard() {
   const profilePct = user?.profileComplete ?? 0;
   const score = user?.eligibilityScore ?? 0;
   const greeting = greetingForHour(new Date().getHours());
+
+  const goApply = () => {
+    if (blockingApplication) {
+      toast.message("Finish your current application first");
+      navigate(blockingApplicationDestination(blockingApplication));
+      return;
+    }
+    navigate({ to: "/apply" });
+  };
 
   const enter = (delay = 0) =>
     reduceMotion
@@ -149,13 +163,11 @@ function Dashboard() {
 
           <div className="mt-7 flex flex-wrap gap-2">
             <Button
-              asChild
               size="lg"
               className="rounded-xl bg-white font-semibold text-primary hover:bg-white/90"
+              onClick={goApply}
             >
-              <Link to="/apply">
-                <Plus className="mr-1 h-4 w-4" /> Apply for a loan
-              </Link>
+              <Plus className="mr-1 h-4 w-4" /> Apply for a loan
             </Button>
             <Button
               asChild
@@ -235,10 +247,8 @@ function Dashboard() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   When you take a loan, balance and status show here.
                 </p>
-                <Button asChild className="mt-auto rounded-xl gradient-brand text-white">
-                  <Link to="/apply">
-                    <Plus className="mr-1 h-4 w-4" /> Apply now
-                  </Link>
+                <Button className="mt-auto rounded-xl gradient-brand text-white" onClick={goApply}>
+                  <Plus className="mr-1 h-4 w-4" /> Apply now
                 </Button>
               </>
             )}
@@ -385,9 +395,13 @@ function Dashboard() {
             {recent.length === 0 ? (
               <li className="px-5 py-10 text-center text-sm text-muted-foreground md:px-6">
                 No applications yet.{" "}
-                <Link to="/apply" className="font-medium text-primary hover:underline">
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  onClick={goApply}
+                >
                   Apply for a loan
-                </Link>
+                </button>
               </li>
             ) : (
               recent.map((app, i) => (
