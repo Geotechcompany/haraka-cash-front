@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { LifeBuoy, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,7 +40,7 @@ function AdminSupportPage() {
       setDetail(ticket);
       if (ticket) setStatus(ticket.status);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load support ticket");
+      toast.error(getUserFacingError(error, "Could not load support ticket"));
     }
   };
 
@@ -59,7 +60,7 @@ function AdminSupportPage() {
       setDetail(await getDetail({ data: detail.id }));
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update ticket");
+      toast.error(getUserFacingError(error, "Could not update ticket"));
     } finally {
       setIsSaving(false);
     }

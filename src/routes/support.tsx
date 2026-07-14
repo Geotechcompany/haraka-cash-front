@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { getUserFacingError } from "@/lib/user-facing-error";
 import { createSupportTicket } from "@/server/support";
 
 export const Route = createFileRoute("/support")({
@@ -30,7 +31,7 @@ function SupportPage() {
       setSubject("");
       setMessage("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send message");
+      toast.error(getUserFacingError(error, "Failed to send message"));
     } finally {
       setSubmitting(false);
     }

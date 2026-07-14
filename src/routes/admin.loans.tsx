@@ -44,7 +44,7 @@ function AdminLoansPage() {
       toast.success("Loan marked as disbursed");
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update loan");
+      toast.error(getUserFacingError(error, "Could not update loan"));
     } finally {
       setIsSubmitting(false);
     }
@@ -71,7 +71,7 @@ function AdminLoansPage() {
       setRepaymentLoan(undefined);
       await router.invalidate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not record repayment");
+      toast.error(getUserFacingError(error, "Could not record repayment"));
     } finally {
       setIsSubmitting(false);
     }
