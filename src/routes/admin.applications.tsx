@@ -18,7 +18,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { kes } from "@/lib/loan";
-import { applicationStatusLabel, statusAwaitsProcessingFee } from "@/lib/models/application";
+import {
+  applicationIsPartialOffer,
+  applicationOfferAmount,
+  applicationStatusLabel,
+  statusAwaitsProcessingFee,
+} from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { getAdminApplication, listApplications, reviewApplication } from "@/server/applications";
 import { adminPromptProcessingFeePayment } from "@/server/payments";
@@ -233,7 +238,12 @@ function ApplicationsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 tabular-nums font-semibold">
-                      {kes(a.amount)}
+                      {kes(applicationOfferAmount(a))}
+                      {applicationIsPartialOffer(a) ? (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          req. {kes(a.amount)}
+                        </span>
+                      ) : null}
                       <span className="text-xs text-muted-foreground font-normal">
                         {" "}
                         / {a.months}mo
@@ -363,7 +373,10 @@ function ApplicationsPage() {
               <Detail label="Applicant" value={detail.applicant} />
               <Detail label="Phone" value={detail.phone} />
               <Detail label="M-Pesa" value={detail.mpesaNumber} />
-              <Detail label="Amount" value={kes(detail.amount)} />
+              <Detail label="Amount" value={kes(applicationOfferAmount(detail))} />
+              {applicationIsPartialOffer(detail) ? (
+                <Detail label="Requested" value={kes(detail.amount)} />
+              ) : null}
               <Detail label="Term" value={`${detail.months} months`} />
               <Detail label="Income" value={kes(detail.monthlyIncome)} />
               <Detail label="Employer" value={detail.employer} />

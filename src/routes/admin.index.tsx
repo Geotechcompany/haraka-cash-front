@@ -17,7 +17,7 @@ import {
 import { AdminShell } from "@/components/layout/admin-shell";
 import { StatCard } from "@/components/ui-extras/stat-card";
 import { kes } from "@/lib/loan";
-import { applicationStatusLabel } from "@/lib/models/application";
+import { applicationOfferAmount, applicationStatusLabel } from "@/lib/models/application";
 import { cn } from "@/lib/utils";
 import { listApplications } from "@/server/applications";
 import { getMonthlyLoanVolume } from "@/server/analytics";
@@ -216,7 +216,9 @@ function AdminDashboard() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 tabular-nums font-semibold">{kes(a.amount)}</td>
+                  <td className="px-6 py-4 tabular-nums font-semibold">
+                    {kes(applicationOfferAmount(a))}
+                  </td>
                   <td className="px-6 py-4 hidden md:table-cell text-muted-foreground">
                     {a.employer}
                   </td>

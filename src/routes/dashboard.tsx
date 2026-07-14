@@ -29,7 +29,9 @@ import { Badge } from "@/components/ui/badge";
 import { kes } from "@/lib/loan";
 import { productTypeLabel } from "@/lib/lending-products";
 import {
+  applicationIsPartialOffer,
   applicationNeedsProcessingFee,
+  applicationOfferAmount,
   applicationStatusLabel,
   blockingApplicationDestination,
   findBlockingApplication,
@@ -205,8 +207,13 @@ function Dashboard() {
                   </Badge>
                 </div>
                 <p className="mt-3 font-display text-3xl font-bold tracking-tight tabular-nums">
-                  {kes(featuredApp.amount)}
+                  {kes(applicationOfferAmount(featuredApp))}
                 </p>
+                {applicationIsPartialOffer(featuredApp) ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    of {kes(featuredApp.amount)} requested
+                  </p>
+                ) : null}
                 <p className="mt-1 text-sm text-muted-foreground">
                   {featuredApp.months}-month term · {featuredApp.purpose}
                 </p>
@@ -431,7 +438,9 @@ function Dashboard() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums">{kes(app.amount)}</p>
+                    <p className="text-sm font-semibold tabular-nums">
+                      {kes(applicationOfferAmount(app))}
+                    </p>
                     <span
                       className={cn(
                         "mt-0.5 inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium",

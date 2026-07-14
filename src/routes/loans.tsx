@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { kes } from "@/lib/loan";
 import {
+  applicationIsPartialOffer,
   applicationNeedsProcessingFee,
+  applicationOfferAmount,
   applicationStatusLabel,
   blockingApplicationDestination,
   findBlockingApplication,
@@ -162,8 +164,13 @@ function LoansPage() {
                 {activeLoan ? "Active loan" : pendingOfferHeadline(featuredApp)}
               </p>
               <p className="mt-1 font-display text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
-                {kes(featuredApp.amount)}
+                {kes(applicationOfferAmount(featuredApp))}
               </p>
+              {applicationIsPartialOffer(featuredApp) ? (
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  of {kes(featuredApp.amount)} requested
+                </p>
+              ) : null}
             </div>
             <span
               className={cn(
@@ -278,7 +285,9 @@ function LoansPage() {
               </p>
             </div>
             <div className="text-right">
-              <p className="font-semibold tracking-tight tabular-nums">{kes(a.amount)}</p>
+              <p className="font-semibold tracking-tight tabular-nums">
+                {kes(applicationOfferAmount(a))}
+              </p>
               <p className="text-xs text-muted-foreground">Score {a.eligibilityScore}</p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">

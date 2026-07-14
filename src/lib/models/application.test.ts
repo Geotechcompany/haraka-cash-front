@@ -3,13 +3,18 @@ import test from "node:test";
 
 import {
   applicationBlocksNewApply,
+  applicationHasOffer,
+  applicationIsPartialOffer,
   applicationNeedsProcessingFee,
+  applicationOfferAmount,
   blockingApplicationDestination,
   findBlockingApplication,
   isActiveDisbursedLoan,
   isPendingOfferPipeline,
   pendingOfferHeadline,
+  toApplication,
   type Application,
+  type ApplicationRecord,
 } from "@/lib/models/application";
 
 const sampleApp = (status: Application["status"], feesPaid = false): Application => ({
@@ -100,4 +105,44 @@ test("pendingOfferHeadline reflects fee and CRB state", () => {
     "Under review",
   );
   assert.equal(applicationNeedsProcessingFee({ status: "Approved", feesPaid: false }), true);
+});
+
+test("applicationOfferAmount prefers approvedAmount when offer exists", () => {
+  const partial = {
+    amount: 8_950,
+    approvedAmount: 2_492,
+    status: "AdditionalActionRequired" as const,
+  };
+  assert.equal(applicationOfferAmount(partial), 2_492);
+  assert.equal(applicationHasOffer(partial), true);
+  assert.equal(applicationIsPartialOffer(partial), true);
+  assert.equal(
+    applicationOfferAmount({ amount: 8_950, status: "Pending" }),
+    8_950,
+  );
+  assert.equal(applicationHasOffer({ amount: 8_950, status: "Pending" }), false);
+});
+
+test("toApplication maps approvedAmount from record", () => {
+  const doc: ApplicationRecord = {
+    applicationNumber: "HC-10234",
+    applicant: "Jane",
+    phone: "0712345678",
+    county: "Nairobi",
+    employer: "Acme",
+    monthlyIncome: 50_000,
+    amount: 8_950,
+    approvedAmount: 2_492,
+    months: 3,
+    purpose: "Business",
+    eligibilityScore: 70,
+    riskScore: 30,
+    status: "AdditionalActionRequired",
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+  };
+  const app = toApplication(doc, { feesPaid: false });
+  assert.equal(app.amount, 8_950);
+  assert.equal(app.approvedAmount, 2_492);
+  assert.equal(applicationOfferAmount(app), 2_492);
 });

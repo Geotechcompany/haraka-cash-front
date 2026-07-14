@@ -154,6 +154,30 @@ export function pendingOfferHeadline(app: Pick<Application, "status" | "feesPaid
   return "Offer in progress";
 }
 
+/** Assessed offer exists (approved amount set or post-offer pipeline status). */
+export function applicationHasOffer(
+  app: Pick<Application, "approvedAmount" | "status">,
+): boolean {
+  if (app.approvedAmount != null && app.approvedAmount > 0) return true;
+  return isPendingOfferPipeline(app.status) || app.status === "Disbursing";
+}
+
+/** Principal to display: offered amount when an offer exists, else requested. */
+export function applicationOfferAmount(
+  app: Pick<Application, "approvedAmount" | "amount" | "status">,
+): number {
+  if (applicationHasOffer(app)) {
+    return app.approvedAmount ?? app.amount;
+  }
+  return app.amount;
+}
+
+export function applicationIsPartialOffer(
+  app: Pick<Application, "approvedAmount" | "amount" | "status">,
+): boolean {
+  return applicationHasOffer(app) && applicationOfferAmount(app) < app.amount;
+}
+
 /** Phone used for loan-related STK (prefer apply-form M-Pesa number). */
 export function applicationStkPhone(doc: Pick<ApplicationRecord, "mpesaNumber" | "phone">): string {
   const mpesa = doc.mpesaNumber?.trim();
