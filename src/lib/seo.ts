@@ -1,16 +1,30 @@
 export const SITE_NAME = "HarakaCash";
 export const DEFAULT_OG_IMAGE = "/hero.jpg";
-const DEFAULT_SITE_URL = "https://harakacash.netlify.app";
+const DEFAULT_SITE_URL = "https://harakacashkenya.dpdns.org";
 
-export function getSiteUrl(): string {
+function normalizeSiteUrl(url: string): string {
+  return String(url).trim().replace(/\/$/, "");
+}
+
+export function getSiteUrl(request?: Request): string {
   const fromVite =
     typeof import.meta !== "undefined" ? import.meta.env.VITE_APP_URL : undefined;
   const fromProcess =
     typeof process !== "undefined"
       ? process.env.APP_URL ?? process.env.VITE_APP_URL
       : undefined;
-  const url = fromVite ?? fromProcess ?? DEFAULT_SITE_URL;
-  return String(url).replace(/\/$/, "");
+  const fromEnv = fromVite ?? fromProcess;
+  if (fromEnv) return normalizeSiteUrl(fromEnv);
+
+  if (request) {
+    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    if (host && !host.startsWith("localhost") && !host.startsWith("127.0.0.1")) {
+      const proto = request.headers.get("x-forwarded-proto") ?? "https";
+      return normalizeSiteUrl(`${proto}://${host.split(",")[0].trim()}`);
+    }
+  }
+
+  return normalizeSiteUrl(DEFAULT_SITE_URL);
 }
 
 export function absoluteUrl(path: string): string {

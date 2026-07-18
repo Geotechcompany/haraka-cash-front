@@ -14,9 +14,11 @@ const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
+const PUBLIC_CRAWLER_PATHS = new Set(["/sitemap.xml", "/robots.txt"]);
+
 const authMiddleware = createMiddleware().server(async ({ request, next, context }) => {
   const pathname = new URL(request.url).pathname;
-  if (pathname.startsWith("/api/webhooks/")) {
+  if (PUBLIC_CRAWLER_PATHS.has(pathname) || pathname.startsWith("/api/webhooks/")) {
     return next();
   }
   const runClerk = clerkAuth.options.server;
